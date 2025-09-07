@@ -849,6 +849,25 @@ int Board::parseMove(std::string uciMove) {
     return 0;
 }
 
+void Board::parsePosition(std::string position){
+    std::vector<std::string> command = split(position," ");
+    if(command[1] == "startpos"){
+        FromFEN(startingPosition);
+        if(command[2] != "moves") return;
+        for(auto it=command.begin()+3; it!=command.end(); it++){
+            makeMove(parseMove(*it));
+        }
+    } else if(command[1] == "fen"){
+        int FENlength = position.find(command[8]) - position.find(command[2]);
+        std::string FEN = position.substr(position.find(command[2]),FENlength);
+        FromFEN(FEN);
+        if(command[8] != "moves") return;
+        for(auto it=command.begin()+9; it!=command.end(); it++){
+            makeMove(parseMove(*it));
+        }
+    }
+}
+
 void Board::printBitBoard(U64 bitboard) const{
     std::cout << std::endl << std::endl;
     for(int rank=7; rank>=0; rank--){
@@ -906,6 +925,20 @@ U64 Board::setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const
     }
 
     return occupancy;
+}
+
+std::vector<std::string> Board::split(std::string s,std::string delimiter){
+    std::vector<std::string> tokens;
+    size_t pos = 0;
+    std::string token;
+    while ((pos = s.find(delimiter)) != std::string::npos) {
+        token = s.substr(0, pos);
+        tokens.push_back(token);
+        s.erase(0, pos + delimiter.length());
+    }
+    tokens.push_back(s);
+
+    return tokens;
 }
 
 /**
@@ -995,7 +1028,6 @@ void Board::visualizeBoard() const{
 }
 
 void Board::FromFEN(std::string FEN){
-    //"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
     pieceBoard[White]         = 0x0000000000000000;
     pieceBoard[Black]         = 0x0000000000000000;
     pieceBoard[WhitePawn]     = 0x0000000000000000;

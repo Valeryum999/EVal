@@ -109,6 +109,7 @@ class Board{
         U64 maskRookOccupancy(unsigned int square) const;
         Square parseSquare(std::string square);
         int parseMove(std::string uciMove);
+        void parsePosition(std::string position);
         long long perftDriver(int depth);
         void perftTestSuite();
         void printBitBoard(U64 bitboard) const;
@@ -116,6 +117,7 @@ class Board{
         void printMoveList(moves *moveList) const;
         int searchBestMove(int depth, int alpha, int beta);
         U64 setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const;
+        std::vector<std::string> split(std::string s,std::string delimiter);
         U64 swapNBits(U64 board, int i, int j, int n);
         void test();
         void visualizeBoard() const;

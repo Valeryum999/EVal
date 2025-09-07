@@ -103,6 +103,8 @@ extern std::string blackKnight;
 extern std::string blackBishop;
 extern std::string blackPawn;
 
+extern std::string startingPosition;
+
 extern const int castlingRightsTable[64];
 
 #endif
