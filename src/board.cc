@@ -810,6 +810,45 @@ U64 Board::generateRookAttacksOnTheFly(unsigned int square, U64 block) const{
     return attacks;
 }
 
+Square Board::parseSquare(std::string square){
+    int file = square[0] - 'a';
+    int rank = square[1] - '1';
+    return (Square)(rank * 8 + file);
+}
+
+int Board::parseMove(std::string uciMove) {
+    moves moveList[1];
+    getAllPossibleMoves(moveList);
+    int length = uciMove.length();
+    if(length != 4 && length != 5) return 0;
+    unsigned int fromSquare = parseSquare(uciMove.substr(0,2));
+    unsigned int toSquare = parseSquare(uciMove.substr(2,2));
+    for(int i=0; i<moveList->count; i++){
+        int currentMove = moveList->moves[i];
+        if(getFrom(currentMove) == fromSquare && getTo(currentMove) == toSquare){
+            if(length == 4) return currentMove;
+            int promotedPiece = getPromotedPiece(currentMove);
+            switch(uciMove[4]){
+                case 'q':
+                    if(promotedPiece == WhiteQueen || promotedPiece == BlackQueen) return currentMove;
+                    break;
+                case 'n':
+                    if(promotedPiece == WhiteKnight || promotedPiece == BlackKnight) return currentMove;
+                    break;
+                case 'r':
+                    if(promotedPiece == WhiteRook || promotedPiece == BlackRook) return currentMove;
+                    break;
+                case 'b':
+                    if(promotedPiece == WhiteBishop || promotedPiece == BlackBishop) return currentMove;
+                    break;
+                default:
+                    return 0;
+            }
+        }
+    }
+    return 0;
+}
+
 void Board::printBitBoard(U64 bitboard) const{
     std::cout << std::endl << std::endl;
     for(int rank=7; rank>=0; rank--){
@@ -832,11 +871,11 @@ void Board::printMove(int move) const{
     std::cout << "   "  << squares[getFrom(move)] 
                             << squares[getTo(move)] 
                             << promotedPieces[getPromotedPiece(move)]
-                            << "       " << unicodePieces[getPiece(move)] << "         "
-                            << (getCaptureFlag(move) ? 1 : 0) << "         "
-                            << (getDoublePawnPushFlag(move) ? 1 : 0) << "         "
-                            << (getEnPassantFlag(move) ? 1 : 0) << "            "
-                            << (getCastlingFlag(move) ? 1 : 0) << std::endl;
+                            << "       " << unicodePieces[getPiece(move)]
+                            << (getCaptureFlag(move) ? "   capture " : "")
+                            << (getDoublePawnPushFlag(move) ? "    double pawn push " : "")
+                            << (getEnPassantFlag(move) ? "    en passant " : "")
+                            << (getCastlingFlag(move) ? "    castle" : "") << std::endl;
 }
 
 void Board::printMoveList(moves *moveList) const{
@@ -1162,11 +1201,7 @@ void Board::FromFEN(std::string FEN){
     }
     index++;
     if(FEN[index] != '-'){
-        int file = FEN[index] - 'a';
-        index++;
-        int rank = FEN[index] - '1';
-        printf("%d %d\n",rank,file);
-        enPassant = (Square)(rank * 8 + file);
+        enPassant = parseSquare(FEN.c_str()+index);
     }
     // visualizeBoard();
     // std::cout << std::endl;

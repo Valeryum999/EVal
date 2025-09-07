@@ -107,6 +107,8 @@ class Board{
         U64 maskPawnAttacks(unsigned int square, ColorType color);
         U64 maskBishopOccupancy(unsigned int square) const;
         U64 maskRookOccupancy(unsigned int square) const;
+        Square parseSquare(std::string square);
+        int parseMove(std::string uciMove);
         long long perftDriver(int depth);
         void perftTestSuite();
         void printBitBoard(U64 bitboard) const;
