@@ -27,17 +27,12 @@ Board::Board() {
     initLeaperPiecesMoves();
     initSliderPiecesMoves(false);
     initSliderPiecesMoves(true);
-    count = 0;
+    ply = 0;
+    nodes = 0;
+    bestMove = 0;
+    bestEval = 0;
+    searchCancelled = false;
 }
-
-// unsigned int Board::bitCount(U64 board) const {
-//     unsigned int count = 0;
-//     while(board){
-//         board &= board-1;
-//         count++;
-//     }
-//     return count;
-// }
 
 /**
  * bitScanForward
@@ -94,29 +89,27 @@ int Board::evaluatePosition(){
                 break;
         }
     }
-    return whiteMaterial - blackMaterial;
+    return (whiteMaterial - blackMaterial) * ((toMove == White) ? 1 : -1);
 }
 
-
 int Board::searchBestMove(int depth, int alpha, int beta){
+    nodes++;
     if(depth == 0) {
-        count++;
         return evaluatePosition();
     }
-    int bestMoveSoFar;
+    int bestMoveSoFar = 0;
     int oldAlpha = alpha;
+    int legalMoves = 0;
     moves moveList[1];
+    moveList->count = 0;
     getAllPossibleMoves(moveList);
-    if(moveList->count == 0){
-        if(isSquareAttacked(bitScanForward(pieceBoard[toMove]),(ColorType)(1-toMove))){
-            return -10000;
-        }
-        return 0;
-    }
     for(int i=0; i<moveList->count; i++){
         copyBoard();
         if(!makeMove(moveList->moves[i])) continue;
+        legalMoves++;
+        ply++;
         int evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        ply--;
         restoreBoard();
         if(evaluation >= beta){
             //Move was too good, opponent will avoid this position
@@ -124,8 +117,16 @@ int Board::searchBestMove(int depth, int alpha, int beta){
         }
         if(evaluation > alpha){
             alpha = evaluation;
-            bestMoveSoFar = moveList->moves[i];
+            if(ply == 0) bestMoveSoFar = moveList->moves[i];
+            
         }
+    }
+
+    if(legalMoves == 0){
+        if(isSquareAttacked(bitScanForward(pieceBoard[(toMove == White) ? WhiteKing : BlackKing]),(ColorType)(1-toMove))){
+            return -10000+ply;
+        }
+        return 0;
     }
 
     if(oldAlpha != alpha){
@@ -200,6 +201,18 @@ void Board::initSliderPiecesMoves(bool bishop) {
             }
         }
     }
+}
+
+int Board::generateRandomLegalMove() {
+    moves moveList[1];
+    moveList->count = 0;
+    getAllPossibleMoves(moveList);
+    int move = 0;
+    do{
+        int randomIndex = rand() % moveList->count;
+        move = moveList->moves[randomIndex];
+    } while(!makeMove(move));
+    return move;
 }
 
 U64 Board::getBishopAttacks(unsigned int square, U64 occupancy) const{
@@ -849,23 +862,40 @@ int Board::parseMove(std::string uciMove) {
     return 0;
 }
 
+void Board::parseGo(std::string go){
+    std::vector<std::string> command = split(go," ");
+    // if(command[1] == "depth"){
+    //     if(command[1] != *command.end())
+    //         depth = atoi(command[2].c_str());
+    // }
+    startSearch();
+    printf("Current evaluation %d\n", bestEval);
+    printf("Evaluated %d positions\n", nodes);
+    printMove(bestMove);
+    printMoveUCI(bestMove);
+    //printMoveUCI(generateRandomLegalMove());
+}
+
 void Board::parsePosition(std::string position){
     std::vector<std::string> command = split(position," ");
     if(command[1] == "startpos"){
         FromFEN(startingPosition);
-        if(command[2] != "moves") return;
-        for(auto it=command.begin()+3; it!=command.end(); it++){
-            makeMove(parseMove(*it));
+        if(command[2] == "moves") {
+            for(auto it=command.begin()+3; it!=command.end(); it++){
+                makeMove(parseMove(*it));
+            }
         }
     } else if(command[1] == "fen"){
         int FENlength = position.find(command[8]) - position.find(command[2]);
         std::string FEN = position.substr(position.find(command[2]),FENlength);
         FromFEN(FEN);
-        if(command[8] != "moves") return;
-        for(auto it=command.begin()+9; it!=command.end(); it++){
-            makeMove(parseMove(*it));
+        if(command[8] == "moves"){
+            for(auto it=command.begin()+9; it!=command.end(); it++){
+                makeMove(parseMove(*it));
+            }
         }
     }
+    visualizeBoard();
 }
 
 void Board::printBitBoard(U64 bitboard) const{
@@ -888,13 +918,19 @@ void Board::addMove(int move, moves *moveList){
 
 void Board::printMove(int move) const{
     std::cout << "   "  << squares[getFrom(move)] 
-                            << squares[getTo(move)] 
-                            << promotedPieces[getPromotedPiece(move)]
-                            << "       " << unicodePieces[getPiece(move)]
-                            << (getCaptureFlag(move) ? "   capture " : "")
-                            << (getDoublePawnPushFlag(move) ? "    double pawn push " : "")
-                            << (getEnPassantFlag(move) ? "    en passant " : "")
-                            << (getCastlingFlag(move) ? "    castle" : "") << std::endl;
+                        << squares[getTo(move)] 
+                        << promotedPieces[getPromotedPiece(move)]
+                        << "       " << unicodePieces[getPiece(move)]
+                        << (getCaptureFlag(move) ? "   capture " : "")
+                        << (getDoublePawnPushFlag(move) ? "    double pawn push " : "")
+                        << (getEnPassantFlag(move) ? "    en passant " : "")
+                        << (getCastlingFlag(move) ? "    castle" : "") << std::endl;
+}
+
+void Board::printMoveUCI(int move) const{
+    std::cout << "bestmove " << squares[getFrom(move)]
+                             << squares[getTo(move)]
+                             << promotedPieces[getPromotedPiece(move)] << std::endl;
 }
 
 void Board::printMoveList(moves *moveList) const{
@@ -927,6 +963,11 @@ U64 Board::setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const
     return occupancy;
 }
 
+void Board::sleep(int seconds){
+    std::this_thread::sleep_for(std::chrono::seconds(seconds));
+    searchCancelled = true;
+}
+
 std::vector<std::string> Board::split(std::string s,std::string delimiter){
     std::vector<std::string> tokens;
     size_t pos = 0;
@@ -941,6 +982,17 @@ std::vector<std::string> Board::split(std::string s,std::string delimiter){
     return tokens;
 }
 
+void Board::startSearch(){  
+    searchCancelled = false;
+    for(int searchDepth = 6; searchDepth < 7; searchDepth++){
+        // std::thread sleeper(&Board::sleep, this, 1);
+        // sleeper.detach();
+        bestEval = searchBestMove(searchDepth, -50000, 50000);
+        if(bestEval == 10000 || bestEval == -10000) break; //stop if checkmate
+        if(searchCancelled) break;
+    }
+}
+
 /**
  * swap n none overlapping bits of bit-index i with j
  * @param b any bitboard
@@ -952,6 +1004,50 @@ U64 Board::swapNBits(U64 b, int i, int j, int n) {
    U64     m = ( 1 << n) - 1;
    U64     x = ((b >> i) ^ (b >> j)) & m;
    return  b ^  (x << i) ^ (x << j);
+}
+
+void Board::UCImainLoop() {
+    setbuf(stdin, NULL);
+    setbuf(stdout, NULL);
+
+    std::string input;
+
+    std::cout << "id name EVal" << std::endl;
+    std::cout << "id name Valeryum999" << std::endl;
+    std::cout << std::endl;
+    std::cout << "option name Debug Log File type string default" <<  std::endl;
+    std::cout << "uciok" << std::endl;
+
+    while(true){
+        fflush(stdout);
+        std::getline(std::cin, input);
+        if(input == "") continue;
+        if(input == "isready"){
+            std::cout << "readyok" << std::endl;
+            continue;
+        }
+        if(input.find("position") == 0){
+            parsePosition(input);
+            continue;
+        }
+        if(input == "ucinewgame"){
+            parsePosition("position startpos");
+            continue;
+        }
+        if(input.find("go") == 0){
+            parseGo(input);
+            continue;
+        }
+        if(input == "uci"){
+            std::cout << "id name EVal" << std::endl;
+            std::cout << "id name Valeryum999" << std::endl;
+            std::cout << std::endl;
+            std::cout << "option name Debug Log File type string default" <<  std::endl;
+            std::cout << "uciok" << std::endl;
+            continue;
+        }
+        if(input == "quit") break;
+    }
 }
 
 void Board::visualizeBoard() const{
@@ -1044,8 +1140,6 @@ void Board::FromFEN(std::string FEN){
     pieceBoard[BlackKing]     = 0x0000000000000000;
     occupiedBoard             = 0x0000000000000000;
     castlingRights = 0;
-    canEnPassant[White] = false;
-    canEnPassant[Black] = false;
     unsigned int rank = EIGHT_RANK;
     unsigned int index = 0;
     unsigned int position = 56;
@@ -1235,6 +1329,4 @@ void Board::FromFEN(std::string FEN){
     if(FEN[index] != '-'){
         enPassant = parseSquare(FEN.c_str()+index);
     }
-    // visualizeBoard();
-    // std::cout << std::endl;
 }

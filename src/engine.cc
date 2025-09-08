@@ -2,17 +2,15 @@
 #include "board.h"
 #include <string>
 
-int main(){
+int main(int argc, const char *argv[]){
+    bool isDebug = false;
     Board board = Board();
-    board.FromFEN("rnbqkbnr/pPpppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    board.visualizeBoard();
-
-    std::string input;
-    while(1){
-        std::cout << "Make a move: ";
-        std::cin >> input;
-        board.printMove(board.parseMove(input));
-        std::cout << "Printed move" << std::endl;
+    if(argc == 2){
+        if(!strcmp(argv[1],"DEBUG")) isDebug = true;
     }
+    if(!isDebug) board.UCImainLoop();
+
+    //debug
+    
     return 0;
 }

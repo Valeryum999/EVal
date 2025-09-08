@@ -8,7 +8,8 @@
 #include <locale>
 #include <chrono>
 #include <bits/stdc++.h>
-// #include <cstdlib>
+#include <cstdlib>
+#include <thread>
 
 #define bitCount(bitboard) __builtin_popcountll(bitboard)
 #define getBit(bitboard, square) (bitboard >> square & 1)
@@ -77,19 +78,24 @@ class Board{
     U64 kingAttacks[64];
     Square enPassant;
     ColorType toMove;
-    
+    int ply;
+    int bestMove;
+    int bestEval;
+    int nodes;
+    bool searchCancelled;
+
     public:
-        int count;
-        int bestMove;
         Board();
         void addMove(int move,moves *moveList);
         unsigned int bitScanForward(U64 board) const;
         // unsigned int bitCount(U64 board) const;
         int evaluatePosition();
         U64 findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const;
+        void FromFEN(std::string FEN);
         U64 generateBishopAttacksOnTheFly(unsigned int square, U64 block) const;
         U64 generateRookAttacksOnTheFly(unsigned int square, U64 block) const;
         U64 generateMagicNumber() const;
+        int generateRandomLegalMove();
         U64 getBishopAttacks(unsigned int square, U64 occupancy) const;
         U64 getRookAttacks(unsigned int square, U64 occupancy) const;
         U64 getQueenAttacks(unsigned int square, U64 occupancy) const;
@@ -109,18 +115,22 @@ class Board{
         U64 maskRookOccupancy(unsigned int square) const;
         Square parseSquare(std::string square);
         int parseMove(std::string uciMove);
+        void parseGo(std::string go);
         void parsePosition(std::string position);
         long long perftDriver(int depth);
         void perftTestSuite();
         void printBitBoard(U64 bitboard) const;
         void printMove(int move) const;
+        void printMoveUCI(int move) const;
         void printMoveList(moves *moveList) const;
         int searchBestMove(int depth, int alpha, int beta);
         U64 setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const;
+        void sleep(int seconds);
         std::vector<std::string> split(std::string s,std::string delimiter);
+        void startSearch();
         U64 swapNBits(U64 board, int i, int j, int n);
         void test();
+        void UCImainLoop();
         void visualizeBoard() const;
-        void FromFEN(std::string FEN);
 };
 #endif
