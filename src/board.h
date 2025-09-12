@@ -1,7 +1,6 @@
 #ifndef BOARD_H
 #define BOARD_H
 
-#include "move.h"
 #include "constants.h"
 #include <iostream>
 #include <vector>
@@ -102,7 +101,6 @@ class Board{
         int getAllPossibleMoves(moves *moveList);
         PieceType getPieceTypeAtSquare(U64 square) const;
         U64 getRandomU64number() const;
-        void handleCastlingRights(const Move& move);
         void initLeaperPiecesMoves();
         void initSliderPiecesMoves(bool bishop);
         void initMagicNumbers() const;
