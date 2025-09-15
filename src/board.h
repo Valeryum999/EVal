@@ -35,21 +35,24 @@
 #define getCastlingFlag(move) (move & 0x800000)
 
 #define copyBoard()                                                 \
-    U64 pieceBoardCopy[14];                                         \
-    U64 occupiedBoardCopy, emptyBoardCopy;                          \
+    U64 pieceBoardCopy[12];                                         \
+    U64 occupiedBoardCopy[3], emptyBoardCopy;                       \
+    int butterflyBoardCopy[64];                                     \
     ColorType toMoveCopy;                                           \
     Square enPassantCopy;                                           \
     int castlingRightsCopy;                                         \
-    memcpy(pieceBoardCopy, pieceBoard, 112);                        \
-    occupiedBoardCopy = occupiedBoard;                              \
+    memcpy(pieceBoardCopy, pieceBoard, 96);                         \
+    memcpy(occupiedBoardCopy, occupiedBoard, 24);                   \
+    memcpy(butterflyBoardCopy, butterflyBoard, 256);                \
     emptyBoardCopy = emptyBoard;                                    \
     toMoveCopy = toMove;                                            \
     enPassantCopy = enPassant;                                      \
     castlingRightsCopy = castlingRights;                            \
 
 #define restoreBoard()                                              \
-    memcpy(pieceBoard,pieceBoardCopy,112);                          \
-    occupiedBoard = occupiedBoardCopy;                              \
+    memcpy(pieceBoard,pieceBoardCopy,96);                           \
+    memcpy(occupiedBoard, occupiedBoardCopy, 24);                   \
+    memcpy(butterflyBoard, butterflyBoardCopy, 256);                \
     emptyBoard = emptyBoardCopy;                                    \
     toMove = toMoveCopy;                                            \
     enPassant = enPassantCopy;                                      \
@@ -61,8 +64,8 @@ struct moves{
 };
 
 class Board{
-    U64 pieceBoard[14];
-    U64 occupiedBoard;
+    U64 pieceBoard[12];
+    U64 occupiedBoard[3];
     U64 emptyBoard;
     PieceType mailboxBoard[64];
     int castlingRights;
@@ -75,13 +78,22 @@ class Board{
     U64 rookMasks[64];
     U64 rookAttacks[64][4096];
     U64 kingAttacks[64];
+    int butterflyBoard[64];
     Square enPassant;
     ColorType toMove;
     int ply;
+    int maxPly;
+    int PVLength[64];
+    int PVTable[64][64];
     int bestMove;
     int bestEval;
-    int nodes;
+    int killerMoves[2][64];
+    int historyMoves[12][64];
+    long long nodes;
+    int searchDepth;
     bool searchCancelled;
+    int mg_table[12][64];
+    int eg_table[12][64];
 
     public:
         Board();
@@ -102,8 +114,9 @@ class Board{
         PieceType getPieceTypeAtSquare(U64 square) const;
         U64 getRandomU64number() const;
         void initLeaperPiecesMoves();
-        void initSliderPiecesMoves(bool bishop);
         void initMagicNumbers() const;
+        void initTables();
+        void initSliderPiecesMoves(bool bishop);
         bool isSquareAttacked(unsigned int square,ColorType color) const;
         int  makeMove(int move);
         U64 maskKingAttacks(unsigned int square);
@@ -121,14 +134,19 @@ class Board{
         void printMove(int move) const;
         void printMoveUCI(int move) const;
         void printMoveList(moves *moveList) const;
+        void printMoveScores(moves *moveList, int *scores);
+        int quiescienceSearch(int alpha, int beta);
+        int scoreMove(int move);
         int searchBestMove(int depth, int alpha, int beta);
         U64 setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const;
         void sleep(int seconds);
+        void sortMoves(moves *moveList);
         std::vector<std::string> split(std::string s,std::string delimiter);
         void startSearch();
         U64 swapNBits(U64 board, int i, int j, int n);
         void test();
         void UCImainLoop();
         void visualizeBoard() const;
+        void visualizeButterflyBoard() const;
 };
 #endif

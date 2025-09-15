@@ -10,10 +10,11 @@ typedef unsigned long long U64; // supported by MSC 13.00+ and C99
 enum ColorType{
     White,
     Black,
+    Both
 };
 
 enum PieceType{
-    WhitePawn = 2,
+    WhitePawn,
     WhiteKnight,
     WhiteBishop,
     WhiteRook,
@@ -25,6 +26,7 @@ enum PieceType{
     BlackRook,
     BlackQueen,
     BlackKing,
+    NoPiece
 };
 
 enum Square {
@@ -73,6 +75,10 @@ extern U64 notEighthRankAFile;
 extern U64 notEighthRankHFile;
 extern U64 notABFiles;
 extern U64 notGHFiles;
+extern U64 h1f1;
+extern U64 a1d1;
+extern U64 h8f8;
+extern U64 a8d8;
 extern U64 DIAGONAL;
 extern U64 ANTIDIAGONAL;
 extern U64 LIGHT_SQUARES;
@@ -87,9 +93,10 @@ extern const U64 bishopMagicNumbers[64];
 extern const U64 rookMagicNumbers[64];
 
 extern const char squares[65][3];
-extern const char pieces[14][12];
+extern const char colors[2][6];
+extern const char pieces[12][12];
 extern const char promotedPieces[];
-extern std::string unicodePieces[14];
+extern std::string unicodePieces[12];
 extern std::string whitePawn;
 extern std::string whiteKing;
 extern std::string whiteQueen;
@@ -104,7 +111,32 @@ extern std::string blackBishop;
 extern std::string blackPawn;
 
 extern std::string startingPosition;
+extern std::string startingPosition;
+extern std::string trickyPosition;
+extern std::string killerPosition;
+extern std::string cmkPosition;
 
 extern const int castlingRightsTable[64];
+
+extern const int MVV_LVA[12][12];
+extern int squareToVisualBoardSquare[64];
+extern int mg_pawn_table[64];
+extern int mg_knight_table[64];
+extern int mg_bishop_table[64];
+extern int mg_rook_table[64];
+extern int mg_queen_table[64];
+extern int mg_king_table[64];
+extern int eg_pawn_table[64];
+extern int eg_knight_table[64];
+extern int eg_bishop_table[64];
+extern int eg_rook_table[64];
+extern int eg_queen_table[64];
+extern int eg_king_table[64];
+
+extern int mg_value[6];
+extern int eg_value[6];
+extern int* mg_pesto_table[6];
+extern int* eg_pesto_table[6];
+extern int gamephaseInc[12];
 
 #endif

@@ -1,4 +1,4 @@
-CFLAGS=-Ofast -march=native -Wall -Wextra
+CFLAGS=-Ofast -march=native -Wall -Wextra #-Ofast -march=native -g -Og
 DEPS = board.h
 ODIR = obj
 _OBJ = constants.o board.o engine.o
