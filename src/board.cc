@@ -215,6 +215,31 @@ int Board::generateRandomLegalMove() {
     return move;
 }
 
+U64 Board::generateZobristHashKey(){
+    U64 key = 0;
+    U64 bitboard;
+    for(int piece=WhitePawn; piece<=BlackKing; piece++){
+        bitboard = pieceBoard[piece];
+        while(bitboard){
+            int square = bitScanForward(bitboard);
+            key ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[piece]+square];
+            popBit(bitboard,square);
+        }
+    }
+    if(castlingRights & 1) key ^= PolyglotRandomNumbers[768];
+    if(castlingRights & 2) key ^= PolyglotRandomNumbers[769];
+    if(castlingRights & 4) key ^= PolyglotRandomNumbers[770];
+    if(castlingRights & 8) key ^= PolyglotRandomNumbers[771];
+    
+    if((enPassant != noSquare) && (pawnAttacks[1-toMove][enPassant] & pieceBoard[WhitePawn+6*toMove]))
+        key ^= PolyglotRandomNumbers[772+enPassant%8];
+    
+    if(toMove == White)
+        key ^= PolyglotRandomNumbers[780];
+    
+    return key;
+}
+
 U64 Board::getBishopAttacks(unsigned int square, U64 occupancy) const{
     occupancy &= bishopMasks[square];
     occupancy *= bishopMagicNumbers[square];
@@ -475,7 +500,6 @@ U64 Board::generateMagicNumber() const{
     return getRandomU64number() & getRandomU64number() & getRandomU64number(); 
 }
 
-// Checks if given square is attacked by given color
 bool Board::isSquareAttacked(unsigned int square,ColorType color) const{
     if((color == White) && (pawnAttacks[Black][square] & pieceBoard[WhitePawn])) return true;
     if((color == Black) && (pawnAttacks[White][square] & pieceBoard[BlackPawn])) return true;
@@ -1306,6 +1330,7 @@ void Board::FromFEN(std::string FEN){
     occupiedBoard[Both]       = 0x0000000000000000;
     for(int square=a1; square<=h8; square++) butterflyBoard[square] = NoPiece;
     castlingRights = 0;
+    enPassant = noSquare;
     unsigned int rank = EIGHT_RANK;
     unsigned int index = 0;
     unsigned int position = 56;
@@ -1478,7 +1503,6 @@ void Board::FromFEN(std::string FEN){
         }
         index++;
     }
-    //2n5/2pP4/1p1p4/2pP3r/KR2Pp1k/8/1p4P1/N7 w - c6 0 1
     index++;
     toMove = (FEN[index] == 'w') ? White : Black;
     index+=2;
@@ -1507,4 +1531,37 @@ void Board::FromFEN(std::string FEN){
     if(FEN[index] != '-'){
         enPassant = parseSquare(FEN.c_str()+index);
     }
+}
+
+void Board::ZobristHashingTestSuite(){
+    std::string correct = u8"✅";
+    std::string incorrect = u8"❌";
+    U64 key;
+    FromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    key = generateZobristHashKey();
+    std::cout << "Test 1: " << ((key == 0x463b96181691fc9c) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
+    key = generateZobristHashKey();
+    std::cout << "Test 2: " << ((key == 0x823c9b50fd114196) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/ppp1pppp/8/3p4/4P3/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 2");
+    key = generateZobristHashKey();
+    std::cout << "Test 3: " << ((key == 0x0756b94461c50fb0) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/ppp1pppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2");
+    key = generateZobristHashKey();
+    std::cout << "Test 4: " << ((key == 0x662fafb965db29d4) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3");
+    key = generateZobristHashKey();
+    std::cout << "Test 5: " << ((key == 0x22a48b5a8e47ff78) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/ppp1p1pp/8/3pPp2/8/8/PPPPKPPP/RNBQ1BNR b kq - 0 3");
+    key = generateZobristHashKey();
+    std::cout << "Test 6: " << ((key == 0x652a607ca3f242c1) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbq1bnr/ppp1pkpp/8/3pPp2/8/8/PPPPKPPP/RNBQ1BNR w - - 0 4");
+    key = generateZobristHashKey();
+    std::cout << "Test 7: " << ((key == 0x00fdd303c946bdd9) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/p1pppppp/8/8/PpP4P/8/1P1PPPP1/RNBQKBNR b KQkq c3 0 3");
+    key = generateZobristHashKey();
+    std::cout << "Test 8: " << ((key == 0x3c8123ea7b067637) ? correct : incorrect) << " " << std::hex << key << std::endl;
+    FromFEN("rnbqkbnr/p1pppppp/8/8/P6P/R1p5/1P1PPPP1/1NBQKBNR b Kkq - 0 4");
+    key = generateZobristHashKey();
+    std::cout << "Test 9: " << ((key == 0x5c3f9b829b279560) ? correct : incorrect) << " " << std::hex << key << std::endl;
 }

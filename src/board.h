@@ -107,6 +107,7 @@ class Board{
         U64 generateRookAttacksOnTheFly(unsigned int square, U64 block) const;
         U64 generateMagicNumber() const;
         int generateRandomLegalMove();
+        U64 generateZobristHashKey();
         U64 getBishopAttacks(unsigned int square, U64 occupancy) const;
         U64 getRookAttacks(unsigned int square, U64 occupancy) const;
         U64 getQueenAttacks(unsigned int square, U64 occupancy) const;
@@ -148,5 +149,6 @@ class Board{
         void UCImainLoop();
         void visualizeBoard() const;
         void visualizeButterflyBoard() const;
+        void ZobristHashingTestSuite();
 };
 #endif

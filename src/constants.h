@@ -63,6 +63,12 @@ enum Files{
     H_FILE,
 };
 
+enum PolyglotOffsets{
+    CASTLING = 768,
+    EN_PASSANT = 772,
+    TURN = 780
+};
+
 extern U64 FILES[8];
 extern U64 RANKS[8];
 extern U64 notAFile;
@@ -138,5 +144,8 @@ extern int eg_value[6];
 extern int* mg_pesto_table[6];
 extern int* eg_pesto_table[6];
 extern int gamephaseInc[12];
+
+extern const int PolyglotKindOfPiece[12];
+extern const U64 PolyglotRandomNumbers[781];
 
 #endif
