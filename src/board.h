@@ -41,6 +41,8 @@
     ColorType toMoveCopy;                                           \
     Square enPassantCopy;                                           \
     int castlingRightsCopy;                                         \
+    U64 ZobristHashKeyCopy;                                         \
+    bool didPolyglotFlipEnPassantCopy;                              \
     memcpy(pieceBoardCopy, pieceBoard, 96);                         \
     memcpy(occupiedBoardCopy, occupiedBoard, 24);                   \
     memcpy(butterflyBoardCopy, butterflyBoard, 256);                \
@@ -48,6 +50,8 @@
     toMoveCopy = toMove;                                            \
     enPassantCopy = enPassant;                                      \
     castlingRightsCopy = castlingRights;                            \
+    ZobristHashKeyCopy = ZobristHashKey;                            \
+    didPolyglotFlipEnPassantCopy = didPolyglotFlipEnPassant
 
 #define restoreBoard()                                              \
     memcpy(pieceBoard,pieceBoardCopy,96);                           \
@@ -57,6 +61,8 @@
     toMove = toMoveCopy;                                            \
     enPassant = enPassantCopy;                                      \
     castlingRights = castlingRightsCopy;                            \
+    ZobristHashKey = ZobristHashKeyCopy;                            \
+    didPolyglotFlipEnPassant = didPolyglotFlipEnPassantCopy
 
 struct moves{
     int moves[256];
@@ -80,6 +86,7 @@ class Board{
     U64 kingAttacks[64];
     int butterflyBoard[64];
     Square enPassant;
+    bool didPolyglotFlipEnPassant;
     ColorType toMove;
     int ply;
     int maxPly;
@@ -94,6 +101,7 @@ class Board{
     bool searchCancelled;
     int mg_table[12][64];
     int eg_table[12][64];
+    U64 ZobristHashKey;
 
     public:
         Board();
