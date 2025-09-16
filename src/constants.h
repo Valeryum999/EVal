@@ -69,6 +69,13 @@ enum PolyglotOffsets{
     TURN = 780
 };
 
+enum hashFlags{
+    EXACT,
+    ALPHA,
+    BETA,
+    UNKNOWN = 100000
+};
+
 extern U64 FILES[8];
 extern U64 RANKS[8];
 extern U64 notAFile;
@@ -123,6 +130,8 @@ extern std::string killerPosition;
 extern std::string cmkPosition;
 
 extern const int castlingRightsTable[64];
+
+#define hashTableSize 0x400000
 
 extern const int MVV_LVA[12][12];
 extern int squareToVisualBoardSquare[64];

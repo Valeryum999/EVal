@@ -1,5 +1,7 @@
 #include "board.h"
 
+transpositionTableType transpositionTable[0x400000];
+
 Board::Board() {
     pieceBoard[WhitePawn]     = 0x0000000000000000;
     pieceBoard[WhiteKnight]   = 0x0000000000000000;
@@ -16,7 +18,6 @@ Board::Board() {
     occupiedBoard[White]      = 0x0000000000000000;
     occupiedBoard[Black]      = 0x0000000000000000;
     occupiedBoard[Both]       = 0x0000000000000000;
-    //TODO: implement butterfly board to easily get the piece on a given square
     for(int square=a1; square<=h8; square++) butterflyBoard[square] = NoPiece;
     castlingRights = 0;
     canEnPassant[White] = false;
@@ -35,6 +36,7 @@ Board::Board() {
     initTables();
     ZobristHashKey = 0;
     didPolyglotFlipEnPassant = false;
+    initTranspositionTable();
 }
 
 void Board::addMove(int move, moves *moveList){
@@ -181,6 +183,10 @@ void Board::initLeaperPiecesMoves() {
         knightAttacks[square] = maskKnightAttacks(square);
         kingAttacks[square] = maskKingAttacks(square);
     }
+}
+
+void Board::initTranspositionTable() {
+    memset(transpositionTable, 0, sizeof(transpositionTable));
 }
 
 void Board::initSliderPiecesMoves(bool bishop) {
@@ -1006,35 +1012,6 @@ void Board::printBitBoard(U64 bitboard) const{
     std::cout << "     a b c d e f g h" << std::endl;
 }
 
-int Board::quiescienceSearch(int alpha, int beta){
-    nodes++;
-    // PVLength[ply] = ply;
-    int currentEval = evaluatePosition();
-    if(searchCancelled) return currentEval;
-    if(currentEval >= beta) return beta;
-    if(currentEval > alpha) alpha = currentEval;
-    moves moveList[1];
-    getAllPossibleMoves(moveList);
-    sortMoves(moveList);
-    for(int i=0; i<moveList->count; i++){
-        if(!getCaptureFlag(moveList->moves[i])) break; // ordered moves contain only captures for now
-        copyBoard();
-        if(!makeMove(moveList->moves[i])) continue;
-        ply++;
-        int evaluation = -quiescienceSearch(-beta, -alpha);
-        ply--;
-        restoreBoard();
-        if(evaluation >= beta){
-            //Move was too good, opponent will avoid this position
-            return beta; // pruned branch
-        }
-        if(evaluation > alpha){
-            alpha = evaluation;
-        }
-    }
-    return alpha;
-}
-
 void Board::printMove(int move) const{
     std::cout << "   "  << squares[getFrom(move)] 
                         << squares[getTo(move)] 
@@ -1069,7 +1046,65 @@ void Board::printMoveList(moves *moveList) const{
     }
 }
 
+int Board::probeHash(int depth, int alpha, int beta){
+    transpositionTableType *hashEntry = &transpositionTable[ZobristHashKey % hashTableSize];
+    if(hashEntry->key == ZobristHashKey){
+        if(hashEntry->depth >= depth){
+            if(hashEntry->flag == EXACT)
+                return hashEntry->evaluation;
+            if(hashEntry->flag == ALPHA && hashEntry->evaluation <= alpha)
+                return alpha;
+            if(hashEntry->flag == BETA && hashEntry->evaluation >= beta)
+                return beta;
+        }
+        if(hashEntry->bestMove != 0 && PVTable[ply][ply] != hashEntry->bestMove){
+            PVTable[ply][ply] = hashEntry->bestMove;
+            // printf("Modifying best move\n");
+        }
+    }
+    return UNKNOWN;
+}
+
+int Board::quiescienceSearch(int alpha, int beta){
+    nodes++;
+    // PVLength[ply] = ply;
+    int currentEval = evaluatePosition();
+    if(currentEval >= beta) return beta;
+    if(currentEval > alpha) alpha = currentEval;
+    moves moveList[1];
+    getAllPossibleMoves(moveList);
+    sortMoves(moveList);
+    for(int i=0; i<moveList->count; i++){
+        if(!getCaptureFlag(moveList->moves[i])) continue;
+        copyBoard();
+        if(!makeMove(moveList->moves[i])) continue;
+        ply++;
+        int evaluation = -quiescienceSearch(-beta, -alpha);
+        ply--;
+        restoreBoard();
+        if(searchCancelled) return 0;
+        if(evaluation >= beta){
+            return beta;
+        }
+        if(evaluation > alpha){
+            alpha = evaluation;
+        }
+    }
+    return alpha;
+}
+
+void Board::recordHash(int depth, int evaluation, int hashFlag){
+    transpositionTableType *hashEntry = &transpositionTable[ZobristHashKey % hashTableSize];
+
+    hashEntry->key = ZobristHashKey;
+    hashEntry->depth = depth;
+    hashEntry->evaluation = evaluation;
+    hashEntry->bestMove = PVTable[ply][ply];
+    hashEntry->flag = hashFlag;
+}
+
 int Board::scoreMove(int move){
+    if(move == PVTable[0][ply]) return 50000; //in tricky position it's worse but everywhere else it's better ?
     if(getCaptureFlag(move)){
         int targetPiece = butterflyBoard[getTo(move)];
         return MVV_LVA[getPiece(move)][targetPiece] + 10000;
@@ -1083,9 +1118,14 @@ int Board::scoreMove(int move){
 
 int Board::searchBestMove(int depth, int alpha, int beta){
     nodes++;
-    bool foundPV = false;
+    // bool foundPV = false;
     PVLength[ply] = ply;
-    if(searchCancelled) return evaluatePosition();
+    int evaluation;
+    int hashFlag = ALPHA;
+    if((evaluation = probeHash(depth, alpha, beta)) != UNKNOWN){
+        // printf("Evaluation: %d depth: %d alpha: %d beta: %d ZobristHashKey: %llx\n",evaluation,depth, alpha, beta, ZobristHashKey);
+        return evaluation;
+    }
     if(depth == 0) {
         return quiescienceSearch(alpha,beta);
     }
@@ -1099,24 +1139,25 @@ int Board::searchBestMove(int depth, int alpha, int beta){
         if(!makeMove(moveList->moves[i])) continue;
         legalMoves++;
         ply++;
-        int evaluation;
-        if(foundPV){
-            evaluation = -searchBestMove(depth-1, -alpha-1, -alpha);
-            if(evaluation > alpha && evaluation < beta)
-                evaluation = -searchBestMove(depth-1, -beta, -alpha);
-        } else 
-            evaluation = -searchBestMove(depth-1, -beta, -alpha);
-        
+        // if(foundPV){
+        //     evaluation = -searchBestMove(depth-1, -alpha-1, -alpha);
+        //     if(evaluation > alpha && evaluation < beta)
+        //         evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        // } else 
+        //     evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        evaluation = -searchBestMove(depth-1, -beta, -alpha);
         ply--;
         restoreBoard();
+        if(searchCancelled) return 0;
         if(evaluation >= beta){
-            //Move was too good, opponent will avoid this position
+            recordHash(depth, beta, BETA);
             killerMoves[1][ply] = killerMoves[0][ply];
             killerMoves[0][ply] = moveList->moves[i];
-            return beta; // pruned branch
+            return beta;
         }
         if(evaluation > alpha){
-            foundPV = true;
+            hashFlag = EXACT;
+            // foundPV = true;
             if(!getCaptureFlag(moveList->moves[i]))
                 historyMoves[getPiece(moveList->moves[i])][getTo(moveList->moves[i])] += depth; //remember this move as it improves our position
             alpha = evaluation;
@@ -1125,7 +1166,6 @@ int Board::searchBestMove(int depth, int alpha, int beta){
                 PVTable[ply][next] = PVTable[ply+1][next];
             PVLength[ply] = PVLength[ply+1];
         }
-        
     }
 
     if(legalMoves == 0){
@@ -1134,6 +1174,8 @@ int Board::searchBestMove(int depth, int alpha, int beta){
         }
         return 0;
     }
+
+    recordHash(depth, alpha, hashFlag);
 
     return alpha;
 }
@@ -1167,6 +1209,11 @@ void Board::sortMoves(moves *moveList){
                 return scores[a] > scores[b];
             });
     apply_permutation(moveList->moves, moveList->count,&indices[0]);
+    // std::sort(&scores[0], &scores[0] + moveList->count,[&](int a, int b) -> int {
+    //             return a > b;
+    //         });
+    // printMoveScores(moveList, scores);
+    // exit(0);
 }
 
 void Board::printMoveScores(moves *moveList, int *scores){
@@ -1196,13 +1243,13 @@ std::vector<std::string> Board::split(std::string s,std::string delimiter){
 void Board::startSearch() {
     searchCancelled = false;
     maxPly = 0;
-    std::thread sleeper(&Board::sleep, this, 3);
-    sleeper.detach();
+    // std::thread sleeper(&Board::sleep, this, 5);
+    // sleeper.detach();
     int bestEvalSoFar = 0;
     int PVLengthCopy[64];
     int PVTableCopy[64][64];
     auto start_time = std::chrono::high_resolution_clock::now();
-    for(searchDepth = 1; searchDepth < 64; searchDepth++){
+    for(searchDepth = 1; searchDepth < 8; searchDepth++){
         nodes = 0;
         bestEval = searchBestMove(searchDepth, -50000, 50000);
         if(searchCancelled) {
@@ -1212,7 +1259,7 @@ void Board::startSearch() {
         // printf("Current evaluation %.2f\n", bestEval/100*((toMove == White) ? 1 : -1));
         // printf("Max ply reached: %d\n", maxPly);
         printf("info score cp %d depth %d nodes %lld pv", bestEval, searchDepth, nodes);
-        for(int i=0; i<PVLength[0]; i++){
+        for(int i=0; i<6; i++){
             printf(" ");
             printMoveUCI(PVTable[0][i]);
         }

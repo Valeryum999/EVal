@@ -69,6 +69,15 @@ struct moves{
     int count;
 };
 
+typedef struct {
+    U64 key;
+    int depth;
+    int flag;
+    int bestMove;
+    int evaluation;
+} transpositionTableType;
+
+
 class Board{
     U64 pieceBoard[12];
     U64 occupiedBoard[3];
@@ -125,6 +134,7 @@ class Board{
         void initLeaperPiecesMoves();
         void initMagicNumbers() const;
         void initTables();
+        void initTranspositionTable();
         void initSliderPiecesMoves(bool bishop);
         bool isSquareAttacked(unsigned int square,ColorType color) const;
         int  makeMove(int move);
@@ -144,7 +154,9 @@ class Board{
         void printMoveUCI(int move) const;
         void printMoveList(moves *moveList) const;
         void printMoveScores(moves *moveList, int *scores);
+        int probeHash(int depth, int alpha, int beta);
         int quiescienceSearch(int alpha, int beta);
+        void recordHash(int depth, int evaluation, int hashFlag);
         int scoreMove(int move);
         int searchBestMove(int depth, int alpha, int beta);
         U64 setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const;

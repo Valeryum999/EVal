@@ -1,5 +1,5 @@
-CFLAGS=-Ofast -march=native -Wall -Wextra #-Ofast -march=native -g -Og
-DEPS = board.h
+CFLAGS=-Ofast -march=native -Wall -Wextra #-march=native -g -Og
+DEPS = board.h constants.h
 ODIR = obj
 _OBJ = constants.o board.o engine.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
