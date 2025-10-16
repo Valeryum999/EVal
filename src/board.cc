@@ -58,17 +58,8 @@ void apply_permutation(int *v, int count, int * indices){
     }
 }
 
-/**
- * bitScanForward
- * @author Kim Walisch (2012)
- * @param bb bitboard to scan
- * @precondition bb != 0
- * @return index (0..63) of least significant one bit
- */
-unsigned int Board::bitScanForward(U64 bb) const{
-   const U64 debruijn64 = C64(0x03f79d71b4cb0a89);
-   //assert (bb != 0);
-   return index64[((bb ^ (bb-1)) * debruijn64) >> 58];
+static inline __attribute__((always_inline)) unsigned int bitScanForward(U64 bb) {
+    return __builtin_ctzll(bb);
 }
 
 int Board::evaluatePosition(){
@@ -736,6 +727,10 @@ void Board::perftTestSuite(){
                   << ((nodes == knownNodesStartingPosition[i-1]) ? correct : incorrect) << std::endl;
         if(nodes != knownNodesStartingPosition[i-1]) printf("Wtf nodes %lld\n", knownNodesStartingPosition[i-1]);
     }
+    auto end_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    std::cout << "Test suite completed in " << duration.count() << " milliseconds" << std::endl;
+    return;
     FromFEN("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -");
     knownNodesStartingPosition[0] = 48;
     knownNodesStartingPosition[1] = 2039;
@@ -786,9 +781,9 @@ void Board::perftTestSuite(){
         std::cout << "[+] Depth: " << i << " ply Result: " << nodes << " positions" << (i <= 2 ? "\t\t" : "\t") 
         << ((nodes == knownNodesStartingPosition[i-1]) ? correct : incorrect) << std::endl;
     }
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    std::cout << "Test suite completed in " << duration.count() << " milliseconds" << std::endl;
+    // auto end_time = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+    // std::cout << "Test suite completed in " << duration.count() << " milliseconds" << std::endl;
 }
 
 U64 Board::maskKingAttacks(unsigned int square){

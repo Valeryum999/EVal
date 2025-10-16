@@ -115,7 +115,6 @@ class Board{
     public:
         Board();
         void addMove(int move,moves *moveList);
-        unsigned int bitScanForward(U64 board) const;
         // unsigned int bitCount(U64 board) const;
         int evaluatePosition();
         U64 findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const;
