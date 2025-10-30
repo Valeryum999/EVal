@@ -111,6 +111,7 @@ class Board{
     int mg_table[12][64];
     int eg_table[12][64];
     U64 ZobristHashKey;
+    int timeToThink;
 
     public:
         Board();
@@ -153,9 +154,9 @@ class Board{
         void printMoveUCI(int move) const;
         void printMoveList(moves *moveList) const;
         void printMoveScores(moves *moveList, int *scores);
-        int probeHash(int depth, int alpha, int beta);
+        int probeHash(int depth, int alpha, int beta, int *move);
         int quiescienceSearch(int alpha, int beta);
-        void recordHash(int depth, int evaluation, int hashFlag);
+        void recordHash(int depth, int evaluation, int hashFlag, int move);
         int scoreMove(int move);
         int searchBestMove(int depth, int alpha, int beta);
         U64 setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const;

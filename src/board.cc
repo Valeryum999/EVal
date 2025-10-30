@@ -37,6 +37,7 @@ Board::Board() {
     ZobristHashKey = 0;
     didPolyglotFlipEnPassant = false;
     initTranspositionTable();
+    timeToThink = 5000; //default 5 seconds
 }
 
 void Board::addMove(int move, moves *moveList){
@@ -503,10 +504,10 @@ bool Board::isSquareAttacked(unsigned int square,ColorType color) const{
     if((color == White) && (pawnAttacks[Black][square] & pieceBoard[WhitePawn])) return true;
     if((color == Black) && (pawnAttacks[White][square] & pieceBoard[BlackPawn])) return true;
     if(knightAttacks[square] & ((color == White) ? pieceBoard[WhiteKnight] : pieceBoard[BlackKnight])) return true;
-    if(getBishopAttacks(square,occupiedBoard[Both]) & ((color == White) ? pieceBoard[WhiteBishop] : pieceBoard[BlackBishop])) return true;
-    if(getRookAttacks(square,occupiedBoard[Both]) & ((color == White) ? pieceBoard[WhiteRook] : pieceBoard[BlackRook])) return true;
-    if(getQueenAttacks(square,occupiedBoard[Both]) & ((color == White) ? pieceBoard[WhiteQueen] : pieceBoard[BlackQueen])) return true;
-    if(kingAttacks[square] & ((color == White) ? pieceBoard[WhiteKing] : pieceBoard[BlackKing])) return true;
+    if(getBishopAttacks(square,occupiedBoard[Both]) & pieceBoard[WhiteBishop + 6*color]) return true;
+    if(getRookAttacks(square,occupiedBoard[Both]) & pieceBoard[WhiteRook + 6*color]) return true;
+    if(getQueenAttacks(square,occupiedBoard[Both]) & pieceBoard[WhiteQueen + 6*color]) return true;
+    if(kingAttacks[square] & pieceBoard[WhiteKing + 6*color]) return true;
     return false;
 }
 
@@ -960,10 +961,12 @@ int Board::parseMove(std::string uciMove) {
 
 void Board::parseGo(std::string go){
     std::vector<std::string> command = split(go," ");
-    // if(command[1] == "depth"){
-    //     if(command[1] != *command.end())
-    //         depth = atoi(command[2].c_str());
-    // }
+    // dynamic time thinking
+    if(toMove == White){
+        timeToThink = atoi(command[2].c_str()) / 60000;
+    } else {
+        timeToThink = atoi(command[4].c_str()) / 60000;
+    }
     startSearch();
     printf("\n");
     std::cout << "bestmove ";
@@ -1020,8 +1023,9 @@ void Board::printMove(int move) const{
 
 void Board::printMoveUCI(int move) const{
     std::cout << squares[getFrom(move)]
-              << squares[getTo(move)]
-              << ((getPromotedPiece(move)) ? promotedPieces[getPromotedPiece(move)] : '\0');
+              << squares[getTo(move)];
+    if(getPromotedPiece(move))
+        std::cout << promotedPieces[getPromotedPiece(move)];
 }
 
 void Board::printMoveList(moves *moveList) const{
@@ -1041,20 +1045,17 @@ void Board::printMoveList(moves *moveList) const{
     }
 }
 
-int Board::probeHash(int depth, int alpha, int beta){
+int Board::probeHash(int depth, int alpha, int beta, int *move){
     transpositionTableType *hashEntry = &transpositionTable[ZobristHashKey % hashTableSize];
     if(hashEntry->key == ZobristHashKey){
         if(hashEntry->depth >= depth){
+            *move = hashEntry->bestMove;
             if(hashEntry->flag == EXACT)
                 return hashEntry->evaluation;
             if(hashEntry->flag == ALPHA && hashEntry->evaluation <= alpha)
                 return alpha;
             if(hashEntry->flag == BETA && hashEntry->evaluation >= beta)
                 return beta;
-        }
-        if(hashEntry->bestMove != 0 && PVTable[ply][ply] != hashEntry->bestMove){
-            PVTable[ply][ply] = hashEntry->bestMove;
-            // printf("Modifying best move\n");
         }
     }
     return UNKNOWN;
@@ -1088,13 +1089,13 @@ int Board::quiescienceSearch(int alpha, int beta){
     return alpha;
 }
 
-void Board::recordHash(int depth, int evaluation, int hashFlag){
+void Board::recordHash(int depth, int evaluation, int hashFlag, int move){
     transpositionTableType *hashEntry = &transpositionTable[ZobristHashKey % hashTableSize];
 
     hashEntry->key = ZobristHashKey;
     hashEntry->depth = depth;
     hashEntry->evaluation = evaluation;
-    hashEntry->bestMove = PVTable[ply][ply];
+    hashEntry->bestMove = move;
     hashEntry->flag = hashFlag;
 }
 
@@ -1117,10 +1118,13 @@ int Board::searchBestMove(int depth, int alpha, int beta){
     PVLength[ply] = ply;
     int evaluation;
     int hashFlag = ALPHA;
-    if((evaluation = probeHash(depth, alpha, beta)) != UNKNOWN){
+    // still bugged
+    int bestMoveFromHash = 0;
+    probeHash(depth, alpha, beta, &bestMoveFromHash);
+    // if((evaluation = probeHash(depth, alpha, beta, &bestMove)) != UNKNOWN){
         // printf("Evaluation: %d depth: %d alpha: %d beta: %d ZobristHashKey: %llx\n",evaluation,depth, alpha, beta, ZobristHashKey);
-        return evaluation;
-    }
+        // return evaluation;
+    // }
     if(depth == 0) {
         return quiescienceSearch(alpha,beta);
     }
@@ -1131,32 +1135,33 @@ int Board::searchBestMove(int depth, int alpha, int beta){
     sortMoves(moveList);
     for(int i=0; i<moveList->count; i++){
         copyBoard();
-        if(!makeMove(moveList->moves[i])) continue;
+        int currentMove = moveList->moves[i];
+        if(bestMoveFromHash != 0){
+            currentMove = bestMoveFromHash;
+            bestMoveFromHash = 0;
+            i--;
+        }
+        if(!makeMove(currentMove)) continue;
         legalMoves++;
         ply++;
-        // if(foundPV){
-        //     evaluation = -searchBestMove(depth-1, -alpha-1, -alpha);
-        //     if(evaluation > alpha && evaluation < beta)
-        //         evaluation = -searchBestMove(depth-1, -beta, -alpha);
-        // } else 
-        //     evaluation = -searchBestMove(depth-1, -beta, -alpha);
         evaluation = -searchBestMove(depth-1, -beta, -alpha);
         ply--;
         restoreBoard();
         if(searchCancelled) return 0;
         if(evaluation >= beta){
-            recordHash(depth, beta, BETA);
+            recordHash(depth, beta, BETA, currentMove);
             killerMoves[1][ply] = killerMoves[0][ply];
-            killerMoves[0][ply] = moveList->moves[i];
+            killerMoves[0][ply] = currentMove;
             return beta;
         }
         if(evaluation > alpha){
             hashFlag = EXACT;
             // foundPV = true;
-            if(!getCaptureFlag(moveList->moves[i]))
-                historyMoves[getPiece(moveList->moves[i])][getTo(moveList->moves[i])] += depth; //remember this move as it improves our position
+            recordHash(depth, alpha, hashFlag, currentMove);
+            if(!getCaptureFlag(currentMove))
+                historyMoves[getPiece(currentMove)][getTo(currentMove)] += depth; //remember this move as it improves our position
             alpha = evaluation;
-            PVTable[ply][ply] = moveList->moves[i];
+            PVTable[ply][ply] = currentMove;
             for(int next = ply+1; next < PVLength[ply+1]; next++)
                 PVTable[ply][next] = PVTable[ply+1][next];
             PVLength[ply] = PVLength[ply+1];
@@ -1169,8 +1174,6 @@ int Board::searchBestMove(int depth, int alpha, int beta){
         }
         return 0;
     }
-
-    recordHash(depth, alpha, hashFlag);
 
     return alpha;
 }
@@ -1238,13 +1241,13 @@ std::vector<std::string> Board::split(std::string s,std::string delimiter){
 void Board::startSearch() {
     searchCancelled = false;
     maxPly = 0;
-    // std::thread sleeper(&Board::sleep, this, 5);
-    // sleeper.detach();
+    std::thread sleeper(&Board::sleep, this, timeToThink);
+    sleeper.detach();
     int bestEvalSoFar = 0;
     int PVLengthCopy[64];
     int PVTableCopy[64][64];
     auto start_time = std::chrono::high_resolution_clock::now();
-    for(searchDepth = 1; searchDepth < 8; searchDepth++){
+    for(searchDepth = 1; searchDepth < 64; searchDepth++){
         nodes = 0;
         bestEval = searchBestMove(searchDepth, -50000, 50000);
         if(searchCancelled) {
@@ -1269,19 +1272,6 @@ void Board::startSearch() {
     memcpy(PVLength, PVLengthCopy, 256);
     memcpy(PVTable, PVTableCopy, 16384);
     bestEval = bestEvalSoFar;
-}
-
-/**
- * swap n none overlapping bits of bit-index i with j
- * @param b any bitboard
- * @param i,j positions of bit sequences to swap
- * @param n number of consecutive bits to swap
- * @return bitboard b with swapped bit-sequences
- */
-U64 Board::swapNBits(U64 b, int i, int j, int n) {
-   U64     m = ( 1 << n) - 1;
-   U64     x = ((b >> i) ^ (b >> j)) & m;
-   return  b ^  (x << i) ^ (x << j);
 }
 
 void Board::UCImainLoop() {
