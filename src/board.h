@@ -10,10 +10,14 @@
 #include <cstdlib>
 #include <thread>
 
-#define bitCount(bitboard) __builtin_popcountll(bitboard)
-#define getBit(bitboard, square) (bitboard >> square & 1)
+namespace EVal {
+
 #define setBit(bitboard, square) (bitboard |= C64(1) << square)
 #define popBit(bitboard, square) (bitboard ^= C64(1) << square)
+
+inline __attribute__((always_inline)) int getBit(Bitboard bitboard, unsigned int square){
+    return bitboard >> square & 1;
+}
 
 #define encodeMove(from, to, piece, promotedPiece, capture, doublePawnPush, enPassant, castling) \
     (from) |                \
@@ -35,13 +39,13 @@
 #define getCastlingFlag(move) (move & 0x800000)
 
 #define copyBoard()                                                 \
-    U64 pieceBoardCopy[12];                                         \
-    U64 occupiedBoardCopy[3], emptyBoardCopy;                       \
+    Bitboard pieceBoardCopy[12];                                         \
+    Bitboard occupiedBoardCopy[3], emptyBoardCopy;                       \
     int butterflyBoardCopy[64];                                     \
     ColorType toMoveCopy;                                           \
     Square enPassantCopy;                                           \
     int castlingRightsCopy;                                         \
-    U64 ZobristHashKeyCopy;                                         \
+    Bitboard ZobristHashKeyCopy;                                         \
     bool didPolyglotFlipEnPassantCopy;                              \
     memcpy(pieceBoardCopy, pieceBoard, 96);                         \
     memcpy(occupiedBoardCopy, occupiedBoard, 24);                   \
@@ -70,7 +74,7 @@ struct moves{
 };
 
 typedef struct {
-    U64 key;
+    Bitboard key;
     int depth;
     int flag;
     int bestMove;
@@ -79,20 +83,20 @@ typedef struct {
 
 
 class Board{
-    U64 pieceBoard[12];
-    U64 occupiedBoard[3];
-    U64 emptyBoard;
-    PieceType mailboxBoard[64];
+    Bitboard pieceBoard[12];
+    Bitboard occupiedBoard[3];
+    Bitboard emptyBoard;
+    Piece mailboxBoard[64];
     int castlingRights;
     bool canEnPassant[2];
-    U64 lastMovedPiece;
-    U64 pawnAttacks[2][64];
-    U64 knightAttacks[64];
-    U64 bishopMasks[64];
-    U64 bishopAttacks[64][512];
-    U64 rookMasks[64];
-    U64 rookAttacks[64][4096];
-    U64 kingAttacks[64];
+    Bitboard lastMovedPiece;
+    Bitboard pawnAttacks[2][64];
+    Bitboard knightAttacks[64];
+    Bitboard bishopMasks[64];
+    Bitboard bishopAttacks[64][512];
+    Bitboard rookMasks[64];
+    Bitboard rookAttacks[64][4096];
+    Bitboard kingAttacks[64];
     int butterflyBoard[64];
     Square enPassant;
     bool didPolyglotFlipEnPassant;
@@ -110,46 +114,46 @@ class Board{
     bool searchCancelled;
     int mg_table[12][64];
     int eg_table[12][64];
-    U64 ZobristHashKey;
+    Bitboard ZobristHashKey;
     int timeToThink;
 
     public:
         Board();
-        void addMove(int move,moves *moveList);
-        // unsigned int bitCount(U64 board) const;
-        int evaluatePosition();
-        U64 findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const;
+        constexpr void addMove(int move,moves *moveList);
+        // unsigned int bitCount(Bitboard board) const;
+        constexpr int evaluatePosition();
+        Bitboard findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const;
         void FromFEN(std::string FEN);
-        U64 generateBishopAttacksOnTheFly(unsigned int square, U64 block) const;
-        U64 generateRookAttacksOnTheFly(unsigned int square, U64 block) const;
-        U64 generateMagicNumber() const;
+        constexpr Bitboard generateBishopAttacksOnTheFly(unsigned int square, Bitboard block) const;
+        constexpr Bitboard generateRookAttacksOnTheFly(unsigned int square, Bitboard block) const;
+        Bitboard generateMagicNumber() const;
         int generateRandomLegalMove();
-        U64 generateZobristHashKey();
-        U64 getBishopAttacks(unsigned int square, U64 occupancy) const;
-        U64 getRookAttacks(unsigned int square, U64 occupancy) const;
-        U64 getQueenAttacks(unsigned int square, U64 occupancy) const;
+        Bitboard generateZobristHashKey();
+        constexpr Bitboard getBishopAttacks(unsigned int square, Bitboard occupancy) const;
+        constexpr Bitboard getRookAttacks(unsigned int square, Bitboard occupancy) const;
+        constexpr Bitboard getQueenAttacks(unsigned int square, Bitboard occupancy) const;
         int getAllPossibleMoves(moves *moveList);
-        PieceType getPieceTypeAtSquare(U64 square) const;
-        U64 getRandomU64number() const;
+        Piece getPieceAtSquare(Bitboard square) const;
+        Bitboard getRandomBitboardnumber() const;
         void initLeaperPiecesMoves();
         void initMagicNumbers() const;
         constexpr void initTables();
         void initTranspositionTable();
         void initSliderPiecesMoves(bool bishop);
         bool isSquareAttacked(unsigned int square,ColorType color) const;
-        int  makeMove(int move);
-        U64 maskKingAttacks(unsigned int square);
-        U64 maskKnightAttacks(unsigned int square);
-        U64 maskPawnAttacks(unsigned int square, ColorType color);
-        U64 maskBishopOccupancy(unsigned int square) const;
-        U64 maskRookOccupancy(unsigned int square) const;
+        int makeMove(int move);
+        Bitboard maskKingAttacks(unsigned int square);
+        Bitboard maskKnightAttacks(unsigned int square);
+        Bitboard maskPawnAttacks(unsigned int square, ColorType color);
+        Bitboard maskBishopOccupancy(unsigned int square) const;
+        Bitboard maskRookOccupancy(unsigned int square) const;
         Square parseSquare(std::string square);
         int parseMove(std::string uciMove);
         void parseGo(std::string go);
         void parsePosition(std::string position);
         long long perftDriver(int depth);
         void perftTestSuite();
-        void printBitBoard(U64 bitboard) const;
+        void printBitBoard(Bitboard bitboard) const;
         void printMove(int move) const;
         void printMoveUCI(int move) const;
         void printMoveList(moves *moveList) const;
@@ -159,12 +163,12 @@ class Board{
         void recordHash(int depth, int evaluation, int hashFlag, int move);
         int scoreMove(int move);
         int searchBestMove(int depth, int alpha, int beta);
-        U64 setOccupancyBits(int index, int bitsInMask, U64 occupancy_mask) const;
+        Bitboard setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_mask) const;
         void sleep(int seconds);
         void sortMoves(moves *moveList);
         std::vector<std::string> split(std::string s,std::string delimiter);
         void startSearch();
-        U64 swapNBits(U64 board, int i, int j, int n);
+        Bitboard swapNBits(Bitboard board, int i, int j, int n);
         void test();
         void UCImainLoop();
         int undoMove(int move);
@@ -172,4 +176,21 @@ class Board{
         void visualizeButterflyBoard() const;
         void ZobristHashingTestSuite();
 };
+
+constexpr bool is_ok(Square s) { return s >= a1 && s <= h8; }
+
+constexpr Bitboard square_bb(Square s) {
+    assert(is_ok(s));
+    return (1ULL << s);
+}
+
+inline __attribute__((always_inline)) unsigned int popcount(Bitboard bitboard) {
+    return __builtin_popcountll(bitboard);
+}
+
+inline __attribute__((always_inline)) unsigned int lsb(Bitboard bitboard) {
+    return __builtin_ctzll(bitboard);
+}
+
+} //namespace EVal
 #endif

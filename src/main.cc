@@ -2,6 +2,8 @@
 #include "board.h"
 #include <string>
 
+using namespace EVal;
+
 int main(int argc, const char *argv[]){
     bool isDebug = false;
     Board board = Board();
@@ -11,8 +13,6 @@ int main(int argc, const char *argv[]){
     if(!isDebug) board.UCImainLoop();
 
     //debug
-
-    board.perftTestSuite();
     
     return 0;
 }
