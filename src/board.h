@@ -133,7 +133,7 @@ class Board{
         U64 getRandomU64number() const;
         void initLeaperPiecesMoves();
         void initMagicNumbers() const;
-        void initTables();
+        constexpr void initTables();
         void initTranspositionTable();
         void initSliderPiecesMoves(bool bishop);
         bool isSquareAttacked(unsigned int square,ColorType color) const;
@@ -167,6 +167,7 @@ class Board{
         U64 swapNBits(U64 board, int i, int j, int n);
         void test();
         void UCImainLoop();
+        int undoMove(int move);
         void visualizeBoard() const;
         void visualizeButterflyBoard() const;
         void ZobristHashingTestSuite();

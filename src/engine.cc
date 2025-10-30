@@ -11,6 +11,8 @@ int main(int argc, const char *argv[]){
     if(!isDebug) board.UCImainLoop();
 
     //debug
+
+    board.perftTestSuite();
     
     return 0;
 }

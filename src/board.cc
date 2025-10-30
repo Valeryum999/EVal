@@ -521,7 +521,7 @@ void Board::initMagicNumbers() const{
     }
 }
 
-void Board::initTables() {
+constexpr void Board::initTables() {
     for (int piece = WhitePawn; piece <= WhiteKing; piece++) {
         for (int square = 0; square < 64; square++) {
             mg_table[piece][square] = mg_value[piece] + mg_pesto_table[piece][square];
@@ -675,6 +675,146 @@ int Board::makeMove(int move){
         }
     return 1; 
 }
+
+// int Board::undoMove(int move){
+//     unsigned int fromSquare = getFrom(move);
+//     unsigned int toSquare = getTo(move);
+//     U64 bbFromSquare = C64(1) << fromSquare;
+//     U64 bbToSquare = C64(1) << toSquare;
+//     U64 bbFromToSquare = bbFromSquare ^ bbToSquare;
+//     int piece = getPiece(move);
+//     int promoted = getPromotedPiece(move);
+//     pieceBoard[piece] ^= bbFromToSquare;
+//     occupiedBoard[toMove] ^= bbFromToSquare;
+//     occupiedBoard[Both] ^= bbFromToSquare;
+//     ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[piece]+fromSquare];
+//     ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[piece]+toSquare];
+//     if(getCaptureFlag(move)){
+//         if(butterflyBoard[toSquare] != NoPiece){
+//             pieceBoard[butterflyBoard[toSquare]] ^= bbToSquare;
+//             occupiedBoard[1-toMove] ^= bbToSquare;
+//             occupiedBoard[Both] ^= bbToSquare;
+//             ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[butterflyBoard[toSquare]]+toSquare];
+//         }
+//     }
+//     butterflyBoard[fromSquare] = NoPiece;
+//     butterflyBoard[toSquare] = piece;
+//     if(promoted){
+//         pieceBoard[piece] ^= bbToSquare;
+//         pieceBoard[promoted] ^= bbToSquare;
+//         butterflyBoard[toSquare] = promoted;
+//         ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[piece]+toSquare];
+//         ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[promoted]+toSquare];
+//     }
+//
+//     if(getEnPassantFlag(move)){
+//         if(toMove == White){
+//             setBit(pieceBoard[BlackPawn],(toSquare-8));
+//             setBit(occupiedBoard[Black],(toSquare-8));
+//             setBit(occupiedBoard[Both],(toSquare-8));
+//             butterflyBoard[toSquare-8] = BlackPawn;
+//             ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackPawn]+toSquare-8];
+//         } else {
+//             setBit(pieceBoard[WhitePawn],(toSquare+8));
+//             setBit(occupiedBoard[White],(toSquare+8));
+//             setBit(occupiedBoard[Both],(toSquare+8));
+//             butterflyBoard[toSquare+8] = WhitePawn;
+//             ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhitePawn]+toSquare+8];
+//         }         
+//     }
+//     enPassant = (Square)toSquare;
+//    
+//     // if(didPolyglotFlipEnPassant){
+//     //     ZobristHashKey ^= PolyglotRandomNumbers[EN_PASSANT+enPassantCopy%8];
+//     //     didPolyglotFlipEnPassant = false;
+//     // }
+//
+//     if(getDoublePawnPushFlag(move)){
+//         enPassant = (Square)((toMove == White) ? toSquare - 8 : toSquare + 8);
+//         if((pawnAttacks[toMove][enPassant] & pieceBoard[BlackPawn-6*toMove])){
+//             ZobristHashKey ^= PolyglotRandomNumbers[EN_PASSANT+enPassant%8];
+//             didPolyglotFlipEnPassant = true;
+//         }
+//     }
+// 
+//     if(getCastlingFlag(move)){
+//         switch(toSquare){
+//             case g1:
+//                 pieceBoard[WhiteRook] ^= h1f1;
+//                 occupiedBoard[White] ^= h1f1;
+//                 occupiedBoard[Both] ^= h1f1;
+//                 butterflyBoard[h1] = NoPiece;
+//                 butterflyBoard[f1] = WhiteRook;
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhiteRook]+h1];
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhiteRook]+f1];
+//                 break;
+//             case c1:
+//                 pieceBoard[WhiteRook] ^= a1d1;
+//                 occupiedBoard[White]  ^= a1d1;
+//                 occupiedBoard[Both]   ^= a1d1;
+//                 butterflyBoard[a1] = NoPiece;
+//                 butterflyBoard[d1] = WhiteRook;
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhiteRook]+a1];
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhiteRook]+d1];
+//                 break;
+//             case g8:
+//                 pieceBoard[BlackRook] ^= h8f8;
+//                 occupiedBoard[Black]  ^= h8f8;
+//                 occupiedBoard[Both]   ^= h8f8;
+//                 butterflyBoard[h8] = NoPiece;
+//                 butterflyBoard[f8] = BlackRook;
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+h8];
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+f8];
+//                 break;
+//             case c8:
+//                 pieceBoard[BlackRook] ^= a8d8;
+//                 occupiedBoard[Black]  ^= a8d8;
+//                 occupiedBoard[Both]   ^= a8d8;
+//                 butterflyBoard[a8] = NoPiece;
+//                 butterflyBoard[d8] = BlackRook;
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+a8];
+//                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+d8];
+//                 break;
+//         }     
+//     }
+//     castlingRights &= castlingRightsTable[fromSquare];
+//     castlingRights &= castlingRightsTable[toSquare];
+//
+//     if(castlingRightsCopy != castlingRights){
+//         int change = castlingRightsCopy - castlingRights;
+//         switch(change){
+//             case 1:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING];
+//                 break;
+//             case 2:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+1];
+//                 break;
+//             case 3:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING] ^ PolyglotRandomNumbers[CASTLING+1];
+//                 break;
+//             case 4:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+2];
+//                 break;
+//             case 5:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING]^PolyglotRandomNumbers[CASTLING+2];
+//                 break;
+//             case 8:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+3];
+//                 break;
+//             case 10:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+1]^PolyglotRandomNumbers[CASTLING+3];
+//                 break;
+//             case 12:
+//                 ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+2] ^ PolyglotRandomNumbers[CASTLING+3];
+//                 break;
+//         }
+//     }
+//    
+//     toMove = (ColorType)(1-toMove);
+//     ZobristHashKey ^= PolyglotRandomNumbers[TURN];
+//
+//     return 1;
+// }
 
 void Board::test() {
     moves moveList[1];
