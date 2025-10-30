@@ -3,7 +3,7 @@ CFLAGS=-Ofast -flto -ffloat-store -fexcess-precision=fast -ffast-math -fno-round
 ODIR = obj
 SRCDIR = src
 SOURCES = $(wildcard $(SRCDIR)/*.cc)
-DEPS = src/board.h src/constants.h
+DEPS = $(wildcard $(SRCDIR)/*.h)
 OBJ = $(patsubst $(SRCDIR)/%.cc,$(ODIR)/%.o,$(SOURCES))
 
 engine: $(OBJ)

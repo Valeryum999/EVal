@@ -519,8 +519,8 @@ int Board::makeMove(int move){
     copyBoard();
     unsigned int fromSquare = getFrom(move);
     unsigned int toSquare = getTo(move);
-    Bitboard bbFromSquare = square_bb((Square) fromSquare);
-    Bitboard bbToSquare   = square_bb((Square) toSquare);
+    Bitboard bbFromSquare = square_bb(Square(fromSquare));
+    Bitboard bbToSquare   = square_bb(Square(toSquare));
     Bitboard bbFromToSquare = bbFromSquare ^ bbToSquare;
     int piece = getPiece(move);
     int promoted = getPromotedPiece(move);
@@ -769,7 +769,7 @@ void Board::perftTestSuite(){
 
 Bitboard Board::maskKingAttacks(unsigned int square){
     Bitboard attacks = 0;
-    Bitboard king = square_bb((Square) square);
+    Bitboard king = square_bb(Square(square));
 
     attacks |= king << 7 & notFirstRankHFile;
     attacks |= king << 8 & notFirstRank;  
@@ -785,7 +785,7 @@ Bitboard Board::maskKingAttacks(unsigned int square){
 
 Bitboard Board::maskKnightAttacks(unsigned int square){
     Bitboard attacks = 0;
-    Bitboard knight = square_bb((Square) square);
+    Bitboard knight = square_bb(Square(square));
 
     attacks |= knight << 17 & notAFile;
     attacks |= knight << 10 & notABFiles;  
@@ -801,7 +801,7 @@ Bitboard Board::maskKnightAttacks(unsigned int square){
 
 Bitboard Board::maskPawnAttacks(unsigned int square, ColorType color){
     Bitboard attacks = 0;
-    Bitboard pawn = square_bb((Square) square);
+    Bitboard pawn = square_bb(Square(square));
 
     if(color == White){
         attacks |= pawn << 7 & notHFile;
@@ -820,13 +820,13 @@ Bitboard Board::maskBishopOccupancy(unsigned int square) const{
     int bishopFile = square % 8;
     int rank,file;
     for(rank=bishopRank+1, file=bishopFile+1; rank<7 && file<7; rank++, file++)
-        occupancy |= square_bb((Square) (rank*8 + file));
+        occupancy |= square_bb(Square(rank*8 + file));
     for(rank=bishopRank-1, file=bishopFile+1; rank>0 && file<7; rank--, file++)
-        occupancy |= square_bb((Square) (rank*8 + file));
+        occupancy |= square_bb(Square(rank*8 + file));
     for(rank=bishopRank+1, file=bishopFile-1; rank<7 && file>0; rank++, file--)
-        occupancy |= square_bb((Square) (rank*8 + file));
+        occupancy |= square_bb(Square(rank*8 + file));
     for(rank=bishopRank-1, file=bishopFile-1; rank>0 && file>0; rank--, file--)
-        occupancy |= square_bb((Square) (rank*8 + file));
+        occupancy |= square_bb(Square(rank*8 + file));
 
     return occupancy;
 }
@@ -837,13 +837,13 @@ Bitboard Board::maskRookOccupancy(unsigned int square) const{
     int rookFile = square % 8;
     int rank,file;
     for(rank=rookRank+1; rank<7; rank++)
-        occupancy |= square_bb((Square) (rank*8 + rookFile));
+        occupancy |= square_bb(Square(rank*8 + rookFile));
     for(rank=rookRank-1; rank>0; rank--)
-        occupancy |= square_bb((Square) (rank*8 + rookFile));
+        occupancy |= square_bb(Square(rank*8 + rookFile));
     for(file=rookFile+1; file<7; file++)
-        occupancy |= square_bb((Square) (rookRank*8 + file));
+        occupancy |= square_bb(Square(rookRank*8 + file));
     for(file=rookFile-1; file>0; file--)
-        occupancy |= square_bb((Square) (rookRank*8 + file));
+        occupancy |= square_bb(Square(rookRank*8 + file));
 
 
     return occupancy;
@@ -856,20 +856,20 @@ constexpr Bitboard Board::generateBishopAttacksOnTheFly(unsigned int square, Bit
     int rank = 0;
     int file = 0;
     for(rank=bishopRank+1, file=bishopFile+1; rank<=7 && file<=7; rank++, file++){
-        attacks |= square_bb((Square) (rank*8 + file));
-        if((square_bb((Square) (rank*8 + file))) & block) break;
+        attacks |= square_bb(Square(rank*8 + file));
+        if(square_bb(Square(rank*8 + file)) & block) break;
     }
     for(rank=bishopRank-1, file=bishopFile+1; rank>=0 && file<=7; rank--, file++){
-        attacks |= square_bb((Square) (rank*8 + file));
-        if((square_bb((Square) (rank*8 + file))) & block) break;
+        attacks |= square_bb(Square(rank*8 + file));
+        if(square_bb(Square(rank*8 + file)) & block) break;
     }
     for(rank=bishopRank+1, file=bishopFile-1; rank<=7 && file>=0; rank++, file--){
-        attacks |= square_bb((Square) (rank*8 + file));
-        if((square_bb((Square) (rank*8 + file))) & block) break;
+        attacks |= square_bb(Square(rank*8 + file));
+        if(square_bb(Square(rank*8 + file)) & block) break;
     }
     for(rank=bishopRank-1, file=bishopFile-1; rank>=0 && file>=0; rank--, file--){
-        attacks |= square_bb((Square) (rank*8 + file));
-        if((square_bb((Square) (rank*8 + file))) & block) break;
+        attacks |= square_bb(Square(rank*8 + file));
+        if(square_bb(Square(rank*8 + file)) & block) break;
     }
 
     return attacks;
@@ -882,22 +882,22 @@ constexpr Bitboard Board::generateRookAttacksOnTheFly(unsigned int square, Bitbo
     int rank = 0;
     int file = 0;
     for(rank=rookRank+1; rank<=7; rank++){
-        Bitboard attack = square_bb((Square) (rank*8 + rookFile));
+        Bitboard attack = square_bb(Square(rank*8 + rookFile));
         attacks |= attack;
         if(attack & block) break;
     }
     for(rank=rookRank-1; rank>=0; rank--){
-        Bitboard attack = square_bb((Square) (rank*8 + rookFile));
+        Bitboard attack = square_bb(Square(rank*8 + rookFile));
         attacks |= attack;
         if(attack & block) break;
     }
     for(file=rookFile+1; file<=7; file++){
-        Bitboard attack = square_bb((Square) (rookRank*8 + file));
+        Bitboard attack = square_bb(Square(rookRank*8 + file));
         attacks |= attack;
         if(attack & block) break;
     }
     for(file=rookFile-1; file>=0; file--){
-        Bitboard attack = square_bb((Square) (rookRank*8 + file));
+        Bitboard attack = square_bb(Square(rookRank*8 + file));
         attacks |= attack;
         if(attack & block) break;
     }
@@ -1166,7 +1166,7 @@ Bitboard Board::setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_m
         int square = lsb(occupancy_mask);
         popBit(occupancy_mask,square);
         if(index & (1 << count))
-            occupancy |= square_bb((Square) square);
+            occupancy |= square_bb(Square(square));
     }
 
     return occupancy;
@@ -1472,7 +1472,7 @@ void Board::FromFEN(std::string FEN){
                 break;
 
             case 'r':
-                rook = square_bb((Square) position);
+                rook = square_bb(Square(position));
                 pieceBoard[BlackRook] ^= rook;
                 occupiedBoard[Black] ^= rook;
                 occupiedBoard[Both] ^= rook;
@@ -1480,7 +1480,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'R':
-                rook = square_bb((Square) position);
+                rook = square_bb(Square(position));
                 pieceBoard[WhiteRook] ^= rook;
                 occupiedBoard[White] ^= rook;
                 occupiedBoard[Both] ^= rook;
@@ -1488,7 +1488,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'b':
-                bishop = square_bb((Square) position);
+                bishop = square_bb(Square(position));
                 pieceBoard[BlackBishop] ^= bishop;
                 occupiedBoard[Black] ^= bishop;
                 occupiedBoard[Both] ^= bishop;
@@ -1496,7 +1496,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'B':
-                bishop = square_bb((Square) position);
+                bishop = square_bb(Square(position));
                 pieceBoard[WhiteBishop] ^= bishop;
                 occupiedBoard[White] ^= bishop;
                 occupiedBoard[Both] ^= bishop;
@@ -1504,7 +1504,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'n':
-                knight = square_bb((Square) position);
+                knight = square_bb(Square(position));
                 pieceBoard[BlackKnight] ^= knight;
                 occupiedBoard[Black] ^= knight;
                 occupiedBoard[Both] ^= knight;
@@ -1512,7 +1512,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'N':
-                knight = square_bb((Square) position);
+                knight = square_bb(Square(position));
                 pieceBoard[WhiteKnight] ^= knight;
                 occupiedBoard[White] ^= knight;
                 occupiedBoard[Both] ^= knight;
@@ -1520,7 +1520,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'q':
-                queen = square_bb((Square) position);
+                queen = square_bb(Square(position));
                 pieceBoard[BlackQueen] ^= queen;
                 occupiedBoard[Black] ^= queen;
                 occupiedBoard[Both] ^= queen;
@@ -1528,7 +1528,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'Q':
-                queen = square_bb((Square) position);
+                queen = square_bb(Square(position));
                 pieceBoard[WhiteQueen] ^= queen;
                 occupiedBoard[White] ^= queen;
                 occupiedBoard[Both] ^= queen;
@@ -1536,7 +1536,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'k':
-                king = square_bb((Square) position);
+                king = square_bb(Square(position));
                 pieceBoard[BlackKing] ^= king;
                 occupiedBoard[Black] ^= king;
                 occupiedBoard[Both] ^= king;
@@ -1544,7 +1544,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'K':
-                king = square_bb((Square) position);
+                king = square_bb(Square(position));
                 pieceBoard[WhiteKing] ^= king;
                 occupiedBoard[White] ^= king;
                 occupiedBoard[Both] ^= king;
@@ -1552,7 +1552,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'p':
-                pawn = square_bb((Square) position);
+                pawn = square_bb(Square(position));
                 pieceBoard[BlackPawn] ^= pawn;
                 occupiedBoard[Black] ^= pawn;
                 occupiedBoard[Both] ^= pawn;
@@ -1560,7 +1560,7 @@ void Board::FromFEN(std::string FEN){
                 position += 1;
                 break;
             case 'P':
-                pawn = square_bb((Square) position);
+                pawn = square_bb(Square(position));
                 pieceBoard[WhitePawn] ^= pawn;
                 occupiedBoard[White] ^= pawn;
                 occupiedBoard[Both] ^= pawn;
