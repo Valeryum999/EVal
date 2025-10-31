@@ -947,10 +947,14 @@ int Position::parseMove(std::string uciMove) {
 void Position::parseGo(std::string go){
     std::vector<std::string> command = split(go," ");
     // dynamic time thinking
-    if(toMove == White){
-        timeToThink = atoi(command[2].c_str()) / 60000;
+    if(command.size() > 1){
+        if(toMove == White){
+            timeToThink = atoi(command[2].c_str()) / 60000 + 1;
+        } else {
+            timeToThink = atoi(command[4].c_str()) / 60000 + 1;
+        }
     } else {
-        timeToThink = atoi(command[4].c_str()) / 60000;
+        timeToThink = 5;
     }
     startSearch();
     printf("\n");
