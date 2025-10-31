@@ -82,7 +82,7 @@ typedef struct {
 } transpositionTableType;
 
 
-class Board{
+class Position{
     Bitboard pieceBoard[12];
     Bitboard occupiedBoard[3];
     Bitboard emptyBoard;
@@ -118,7 +118,7 @@ class Board{
     int timeToThink;
 
     public:
-        Board();
+        Position();
         constexpr void addMove(int move,moves *moveList);
         // unsigned int bitCount(Bitboard board) const;
         constexpr int evaluatePosition();
@@ -176,8 +176,6 @@ class Board{
         void visualizeButterflyBoard() const;
         void ZobristHashingTestSuite();
 };
-
-constexpr bool is_ok(Square s) { return s >= a1 && s <= h8; }
 
 constexpr Bitboard square_bb(Square s) {
     assert(is_ok(s));

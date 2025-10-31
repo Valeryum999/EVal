@@ -1,10 +1,10 @@
-#include "board.h"
+#include "position.h"
 
 namespace EVal{
 
 transpositionTableType transpositionTable[0x400000];
 
-Board::Board() {
+Position::Position() {
     pieceBoard[WhitePawn]     = 0x0000000000000000;
     pieceBoard[WhiteKnight]   = 0x0000000000000000;
     pieceBoard[WhiteBishop]   = 0x0000000000000000;
@@ -42,7 +42,7 @@ Board::Board() {
     timeToThink = 5000; //default 5 seconds
 }
 
-constexpr void Board::addMove(int move, moves *moveList){
+constexpr void Position::addMove(int move, moves *moveList){
     moveList->moves[moveList->count] = move;
     moveList->count++;
 }
@@ -61,7 +61,7 @@ void apply_permutation(int *v, int count, int * indices){
     }
 }
 
-constexpr int Board::evaluatePosition(){
+constexpr int Position::evaluatePosition(){
     int middlegame[2] = {0,0};
     int endgame[2] = {0,0};
     int mobility[2] = {0,0};
@@ -123,7 +123,7 @@ constexpr int Board::evaluatePosition(){
     return (middlegameScore * middlegamePhase + endgameScore * endgamePhase) / 24 + mobilityScore;
 }
 
-Bitboard Board::findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const{
+Bitboard Position::findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const{
     Bitboard occupancies[4096];
     Bitboard attacks[4096];
     Bitboard usedAttacks[4096];
@@ -159,7 +159,7 @@ Bitboard Board::findMagicNumber(unsigned int square, int relevantBits, bool isBi
     return 0;
 }
 
-void Board::initLeaperPiecesMoves() {
+void Position::initLeaperPiecesMoves() {
     for(int square=0; square<64; square++){
         pawnAttacks[White][square] = maskPawnAttacks(square,White);
         pawnAttacks[Black][square] = maskPawnAttacks(square,Black);
@@ -168,11 +168,11 @@ void Board::initLeaperPiecesMoves() {
     }
 }
 
-void Board::initTranspositionTable() {
+void Position::initTranspositionTable() {
     memset(transpositionTable, 0, sizeof(transpositionTable));
 }
 
-void Board::initSliderPiecesMoves(bool bishop) {
+void Position::initSliderPiecesMoves(bool bishop) {
     for(int square=0; square < 64; square++){
         bishopMasks[square] = maskBishopOccupancy(square);
         rookMasks[square] = maskRookOccupancy(square);
@@ -194,7 +194,7 @@ void Board::initSliderPiecesMoves(bool bishop) {
     }
 }
 
-int Board::generateRandomLegalMove() {
+int Position::generateRandomLegalMove() {
     moves moveList[1];
     moveList->count = 0;
     getAllPossibleMoves(moveList);
@@ -206,7 +206,7 @@ int Board::generateRandomLegalMove() {
     return move;
 }
 
-Bitboard Board::generateZobristHashKey(){
+Bitboard Position::generateZobristHashKey(){
     Bitboard key = 0;
     Bitboard bitboard;
     for(int piece=WhitePawn; piece<=BlackKing; piece++){
@@ -217,39 +217,39 @@ Bitboard Board::generateZobristHashKey(){
             popBit(bitboard,square);
         }
     }
-    if(castlingRights & 1) key ^= PolyglotRandomNumbers[CASTLING];
-    if(castlingRights & 2) key ^= PolyglotRandomNumbers[CASTLING+1];
-    if(castlingRights & 4) key ^= PolyglotRandomNumbers[CASTLING+2];
-    if(castlingRights & 8) key ^= PolyglotRandomNumbers[CASTLING+3];
+    if(castlingRights & 1) key ^= PolyglotRandomNumbers[ZH_CASTLING];
+    if(castlingRights & 2) key ^= PolyglotRandomNumbers[ZH_CASTLING+1];
+    if(castlingRights & 4) key ^= PolyglotRandomNumbers[ZH_CASTLING+2];
+    if(castlingRights & 8) key ^= PolyglotRandomNumbers[ZH_CASTLING+3];
 
     if((enPassant != noSquare) && (pawnAttacks[1-toMove][enPassant] & pieceBoard[WhitePawn+6*toMove]))
-        key ^= PolyglotRandomNumbers[EN_PASSANT+enPassant%8];
+        key ^= PolyglotRandomNumbers[ZH_EN_PASSANT+enPassant%8];
     
     if(toMove == White)
-        key ^= PolyglotRandomNumbers[TURN];
+        key ^= PolyglotRandomNumbers[ZH_TURN];
     
     return key;
 }
 
-constexpr Bitboard Board::getBishopAttacks(unsigned int square, Bitboard occupancy) const{
+constexpr Bitboard Position::getBishopAttacks(unsigned int square, Bitboard occupancy) const{
     occupancy &= bishopMasks[square];
     occupancy *= bishopMagicNumbers[square];
     occupancy >>= 64 - bishopRelevantBits[square];
     return bishopAttacks[square][occupancy];
 }
 
-constexpr Bitboard Board::getRookAttacks(unsigned int square, Bitboard occupancy) const{
+constexpr Bitboard Position::getRookAttacks(unsigned int square, Bitboard occupancy) const{
     occupancy &= rookMasks[square];
     occupancy *= rookMagicNumbers[square];
     occupancy >>= 64 - rookRelevantBits[square];
     return rookAttacks[square][occupancy];
 }
 
-constexpr Bitboard Board::getQueenAttacks(unsigned int square, Bitboard occupancy) const{
+constexpr Bitboard Position::getQueenAttacks(unsigned int square, Bitboard occupancy) const{
     return getBishopAttacks(square, occupancy) | getRookAttacks(square, occupancy);
 }
 
-int Board::getAllPossibleMoves(moves *moveList) {
+int Position::getAllPossibleMoves(moves *moveList) {
     moveList->count = 0;
     int result = 0;
     Bitboard bitboard, attacks;
@@ -469,7 +469,7 @@ int Board::getAllPossibleMoves(moves *moveList) {
     return result;
 }
 
-Bitboard Board::getRandomBitboardnumber() const{
+Bitboard Position::getRandomBitboardnumber() const{
     Bitboard n1,n2,n3,n4;
     n1 = (Bitboard)(random() & 0xffff);
     n2 = (Bitboard)(random() & 0xffff);
@@ -479,11 +479,11 @@ Bitboard Board::getRandomBitboardnumber() const{
     return n1 | (n2 << 16) | (n3 << 32) | (n4 << 48);
 }
 
-Bitboard Board::generateMagicNumber() const{
+Bitboard Position::generateMagicNumber() const{
     return getRandomBitboardnumber() & getRandomBitboardnumber() & getRandomBitboardnumber(); 
 }
 
-bool Board::isSquareAttacked(unsigned int square, ColorType color) const{
+bool Position::isSquareAttacked(unsigned int square, ColorType color) const{
     if((color == White) && (pawnAttacks[Black][square] & pieceBoard[WhitePawn])) return true;
     if((color == Black) && (pawnAttacks[White][square] & pieceBoard[BlackPawn])) return true;
     if(knightAttacks[square] & ((color == White) ? pieceBoard[WhiteKnight] : pieceBoard[BlackKnight])) return true;
@@ -494,7 +494,7 @@ bool Board::isSquareAttacked(unsigned int square, ColorType color) const{
     return false;
 }
 
-void Board::initMagicNumbers() const{
+void Position::initMagicNumbers() const{
     for(int square=0; square<64; square++){
         printf(" 0x%lxULL,\n", findMagicNumber(square,bishopRelevantBits[square], true));
     }
@@ -504,7 +504,7 @@ void Board::initMagicNumbers() const{
     }
 }
 
-constexpr void Board::initTables() {
+constexpr void Position::initTables() {
     for (int piece = WhitePawn; piece <= WhiteKing; piece++) {
         for (int square = 0; square < 64; square++) {
             mg_table[piece][square] = mg_value[piece] + mg_pesto_table[piece][square];
@@ -515,7 +515,7 @@ constexpr void Board::initTables() {
     }
 }
 
-int Board::makeMove(int move){
+int Position::makeMove(int move){
     copyBoard();
     unsigned int fromSquare = getFrom(move);
     unsigned int toSquare = getTo(move);
@@ -564,14 +564,14 @@ int Board::makeMove(int move){
     enPassant = noSquare;
     
     if(didPolyglotFlipEnPassant){
-        ZobristHashKey ^= PolyglotRandomNumbers[EN_PASSANT+enPassantCopy%8];
+        ZobristHashKey ^= PolyglotRandomNumbers[ZH_EN_PASSANT+enPassantCopy%8];
         didPolyglotFlipEnPassant = false;
     }
 
     if(getDoublePawnPushFlag(move)){
         enPassant = (Square)((toMove == White) ? toSquare - 8 : toSquare + 8);
         if((pawnAttacks[toMove][enPassant] & pieceBoard[BlackPawn-6*toMove])){
-            ZobristHashKey ^= PolyglotRandomNumbers[EN_PASSANT+enPassant%8];
+            ZobristHashKey ^= PolyglotRandomNumbers[ZH_EN_PASSANT+enPassant%8];
             didPolyglotFlipEnPassant = true;
         }
     }
@@ -623,34 +623,34 @@ int Board::makeMove(int move){
         int change = castlingRightsCopy - castlingRights;
         switch(change){
             case 1:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING];
                 break;
             case 2:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+1];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING+1];
                 break;
             case 3:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING] ^ PolyglotRandomNumbers[CASTLING+1];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING] ^ PolyglotRandomNumbers[ZH_CASTLING+1];
                 break;
             case 4:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+2];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING+2];
                 break;
             case 5:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING]^PolyglotRandomNumbers[CASTLING+2];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING]^PolyglotRandomNumbers[ZH_CASTLING+2];
                 break;
             case 8:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+3];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING+3];
                 break;
             case 10:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+1]^PolyglotRandomNumbers[CASTLING+3];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING+1]^PolyglotRandomNumbers[ZH_CASTLING+3];
                 break;
             case 12:
-                ZobristHashKey ^= PolyglotRandomNumbers[CASTLING+2] ^ PolyglotRandomNumbers[CASTLING+3];
+                ZobristHashKey ^= PolyglotRandomNumbers[ZH_CASTLING+2] ^ PolyglotRandomNumbers[ZH_CASTLING+3];
                 break;
         }
     }
     
     toMove = (ColorType)(1-toMove);
-    ZobristHashKey ^= PolyglotRandomNumbers[TURN];
+    ZobristHashKey ^= PolyglotRandomNumbers[ZH_TURN];
 
     if(isSquareAttacked((toMove == White) ? lsb(pieceBoard[BlackKing]) : lsb(pieceBoard[WhiteKing]),toMove)){
             restoreBoard();
@@ -659,7 +659,7 @@ int Board::makeMove(int move){
     return 1; 
 }
 
-void Board::test() {
+void Position::test() {
     moves moveList[1];
     getAllPossibleMoves(moveList);
     printMoveList(moveList);
@@ -680,7 +680,7 @@ void Board::test() {
     }
 }
 
-long long Board::perftDriver(int depth){
+long long Position::perftDriver(int depth){
     if(depth == 0){
         return 1;
     }
@@ -697,7 +697,7 @@ long long Board::perftDriver(int depth){
     return nodes;
 }
 
-void Board::perftTestSuite(){
+void Position::perftTestSuite(){
     FromFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"); // starting position
     long long knownNodesStartingPosition[7] = {
         20,400,8902,197281,4865609,119060324,0
@@ -767,7 +767,7 @@ void Board::perftTestSuite(){
     return;
 }
 
-Bitboard Board::maskKingAttacks(unsigned int square){
+Bitboard Position::maskKingAttacks(unsigned int square){
     Bitboard attacks = 0;
     Bitboard king = square_bb(Square(square));
 
@@ -783,7 +783,7 @@ Bitboard Board::maskKingAttacks(unsigned int square){
     return attacks;
 }
 
-Bitboard Board::maskKnightAttacks(unsigned int square){
+Bitboard Position::maskKnightAttacks(unsigned int square){
     Bitboard attacks = 0;
     Bitboard knight = square_bb(Square(square));
 
@@ -799,7 +799,7 @@ Bitboard Board::maskKnightAttacks(unsigned int square){
     return attacks;
 }
 
-Bitboard Board::maskPawnAttacks(unsigned int square, ColorType color){
+Bitboard Position::maskPawnAttacks(unsigned int square, ColorType color){
     Bitboard attacks = 0;
     Bitboard pawn = square_bb(Square(square));
 
@@ -814,7 +814,7 @@ Bitboard Board::maskPawnAttacks(unsigned int square, ColorType color){
     return attacks;
 }
 
-Bitboard Board::maskBishopOccupancy(unsigned int square) const{
+Bitboard Position::maskBishopOccupancy(unsigned int square) const{
     Bitboard occupancy = 0;
     int bishopRank = square / 8;
     int bishopFile = square % 8;
@@ -831,7 +831,7 @@ Bitboard Board::maskBishopOccupancy(unsigned int square) const{
     return occupancy;
 }
 
-Bitboard Board::maskRookOccupancy(unsigned int square) const{
+Bitboard Position::maskRookOccupancy(unsigned int square) const{
     Bitboard occupancy = 0;
     int rookRank = square / 8;
     int rookFile = square % 8;
@@ -849,7 +849,7 @@ Bitboard Board::maskRookOccupancy(unsigned int square) const{
     return occupancy;
 }
 
-constexpr Bitboard Board::generateBishopAttacksOnTheFly(unsigned int square, Bitboard block) const{
+constexpr Bitboard Position::generateBishopAttacksOnTheFly(unsigned int square, Bitboard block) const{
     Bitboard attacks = 0;
     int bishopRank = square / 8;
     int bishopFile = square % 8;
@@ -875,7 +875,7 @@ constexpr Bitboard Board::generateBishopAttacksOnTheFly(unsigned int square, Bit
     return attacks;
 }
 
-constexpr Bitboard Board::generateRookAttacksOnTheFly(unsigned int square, Bitboard block) const{
+constexpr Bitboard Position::generateRookAttacksOnTheFly(unsigned int square, Bitboard block) const{
     Bitboard attacks = 0;
     int rookRank = square / 8;
     int rookFile = square % 8;
@@ -905,13 +905,13 @@ constexpr Bitboard Board::generateRookAttacksOnTheFly(unsigned int square, Bitbo
     return attacks;
 }
 
-Square Board::parseSquare(std::string square){
+Square Position::parseSquare(std::string square){
     int file = square[0] - 'a';
     int rank = square[1] - '1';
     return (Square)(rank * 8 + file);
 }
 
-int Board::parseMove(std::string uciMove) {
+int Position::parseMove(std::string uciMove) {
     moves moveList[1];
     getAllPossibleMoves(moveList);
     int length = uciMove.length();
@@ -944,7 +944,7 @@ int Board::parseMove(std::string uciMove) {
     return 0;
 }
 
-void Board::parseGo(std::string go){
+void Position::parseGo(std::string go){
     std::vector<std::string> command = split(go," ");
     // dynamic time thinking
     if(toMove == White){
@@ -960,7 +960,7 @@ void Board::parseGo(std::string go){
     //printMoveUCI(generateRandomLegalMove());
 }
 
-void Board::parsePosition(std::string position){
+void Position::parsePosition(std::string position){
     std::vector<std::string> command = split(position," ");
     if(command[1] == "startpos"){
         FromFEN(startingPosition);
@@ -982,7 +982,7 @@ void Board::parsePosition(std::string position){
     visualizeBoard();
 }
 
-void Board::printBitBoard(Bitboard bitboard) const{
+void Position::printBitBoard(Bitboard bitboard) const{
     std::cout << std::endl << std::endl;
     for(int rank=7; rank>=0; rank--){
         std::cout << "  " << rank+1 << "  ";
@@ -995,7 +995,7 @@ void Board::printBitBoard(Bitboard bitboard) const{
     std::cout << "     a b c d e f g h" << std::endl;
 }
 
-void Board::printMove(int move) const{
+void Position::printMove(int move) const{
     std::cout << "   "  << squares[getFrom(move)] 
                         << squares[getTo(move)] 
                         << promotedPieces[getPromotedPiece(move)]
@@ -1006,14 +1006,14 @@ void Board::printMove(int move) const{
                         << (getCastlingFlag(move) ? "    castle" : "") << std::endl;
 }
 
-void Board::printMoveUCI(int move) const{
+void Position::printMoveUCI(int move) const{
     std::cout << squares[getFrom(move)]
               << squares[getTo(move)];
     if(getPromotedPiece(move))
         std::cout << promotedPieces[getPromotedPiece(move)];
 }
 
-void Board::printMoveList(moves *moveList) const{
+void Position::printMoveList(moves *moveList) const{
     if(!moveList->count) return;
     std::cout << std::endl << "   move      piece    capture    double    enpassant   castling";
     std::cout << std::endl << std::endl;
@@ -1030,7 +1030,7 @@ void Board::printMoveList(moves *moveList) const{
     }
 }
 
-int Board::probeHash(int depth, int alpha, int beta, int *move){
+int Position::probeHash(int depth, int alpha, int beta, int *move){
     transpositionTableType *hashEntry = &transpositionTable[ZobristHashKey % hashTableSize];
     if(hashEntry->key == ZobristHashKey){
         if(hashEntry->depth >= depth){
@@ -1046,7 +1046,7 @@ int Board::probeHash(int depth, int alpha, int beta, int *move){
     return UNKNOWN;
 }
 
-int Board::quiescienceSearch(int alpha, int beta){
+int Position::quiescienceSearch(int alpha, int beta){
     nodes++;
     // PVLength[ply] = ply;
     int currentEval = evaluatePosition();
@@ -1074,7 +1074,7 @@ int Board::quiescienceSearch(int alpha, int beta){
     return alpha;
 }
 
-void Board::recordHash(int depth, int evaluation, int hashFlag, int move){
+void Position::recordHash(int depth, int evaluation, int hashFlag, int move){
     transpositionTableType *hashEntry = &transpositionTable[ZobristHashKey % hashTableSize];
 
     hashEntry->key = ZobristHashKey;
@@ -1084,7 +1084,7 @@ void Board::recordHash(int depth, int evaluation, int hashFlag, int move){
     hashEntry->flag = hashFlag;
 }
 
-int Board::scoreMove(int move){
+int Position::scoreMove(int move){
     if(move == PVTable[0][ply]) return 50000; //in tricky position it's worse but everywhere else it's better ?
     if(getCaptureFlag(move)){
         int targetPiece = butterflyBoard[getTo(move)];
@@ -1097,7 +1097,7 @@ int Board::scoreMove(int move){
     return 0;
 }
 
-int Board::searchBestMove(int depth, int alpha, int beta){
+int Position::searchBestMove(int depth, int alpha, int beta){
     nodes++;
     // bool foundPV = false;
     PVLength[ply] = ply;
@@ -1159,7 +1159,7 @@ int Board::searchBestMove(int depth, int alpha, int beta){
     return alpha;
 }
 
-Bitboard Board::setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_mask) const{
+Bitboard Position::setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_mask) const{
     Bitboard occupancy = 0;
 
     for(int count=0; count<bitsInMask; count++){
@@ -1172,12 +1172,12 @@ Bitboard Board::setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_m
     return occupancy;
 }
 
-void Board::sleep(int seconds){
+void Position::sleep(int seconds){
     std::this_thread::sleep_for(std::chrono::seconds(seconds));
     searchCancelled = true;
 }
 
-void Board::sortMoves(moves *moveList){
+void Position::sortMoves(moves *moveList){
     int scores[moveList->count];
     std::vector<int> indices(moveList->count);
     std::iota(indices.begin(),indices.end(),0);
@@ -1195,7 +1195,7 @@ void Board::sortMoves(moves *moveList){
     // exit(0);
 }
 
-void Board::printMoveScores(moves *moveList, int *scores){
+void Position::printMoveScores(moves *moveList, int *scores){
     printf("Debugging sort moves: \n");
     for(int i=0;i<moveList->count;i++){
         printf("move: ");
@@ -1205,7 +1205,7 @@ void Board::printMoveScores(moves *moveList, int *scores){
     printf("\n");
 }
 
-std::vector<std::string> Board::split(std::string s,std::string delimiter){
+std::vector<std::string> Position::split(std::string s,std::string delimiter){
     std::vector<std::string> tokens;
     size_t pos = 0;
     std::string token;
@@ -1219,10 +1219,10 @@ std::vector<std::string> Board::split(std::string s,std::string delimiter){
     return tokens;
 }
 
-void Board::startSearch() {
+void Position::startSearch() {
     searchCancelled = false;
     maxPly = 0;
-    std::thread sleeper(&Board::sleep, this, timeToThink);
+    std::thread sleeper(&Position::sleep, this, timeToThink);
     sleeper.detach();
     int bestEvalSoFar = 0;
     int PVLengthCopy[64];
@@ -1255,7 +1255,7 @@ void Board::startSearch() {
     bestEval = bestEvalSoFar;
 }
 
-void Board::UCImainLoop() {
+void Position::UCImainLoop() {
     setbuf(stdin, NULL);
     setbuf(stdout, NULL);
 
@@ -1299,7 +1299,7 @@ void Board::UCImainLoop() {
     }
 }
 
-void Board::visualizeBoard() const{
+void Position::visualizeBoard() const{
     std::string renderBoard[8][32];
     for(int rank=0; rank<8; rank++){
         for(int file=0; file<8; file++){
@@ -1372,7 +1372,7 @@ void Board::visualizeBoard() const{
                                         << ((castlingRights & 8) ? 'q' : '-') << std::endl;
 }
 
-void Board::visualizeButterflyBoard() const{
+void Position::visualizeButterflyBoard() const{
     std::cout << std::endl;
     for(int rank=7; rank>=0; rank--){
         std::cout << "  " << rank+1 << " ";
@@ -1385,7 +1385,7 @@ void Board::visualizeButterflyBoard() const{
     std::cout << std::endl;
 }
 
-void Board::FromFEN(std::string FEN){
+void Position::FromFEN(std::string FEN){
     pieceBoard[WhitePawn]     = 0x0000000000000000;
     pieceBoard[WhiteKnight]   = 0x0000000000000000;
     pieceBoard[WhiteBishop]   = 0x0000000000000000;
@@ -1607,7 +1607,7 @@ void Board::FromFEN(std::string FEN){
     ZobristHashKey = generateZobristHashKey();
 }
 
-void Board::ZobristHashingTestSuite(){
+void Position::ZobristHashingTestSuite(){
     std::string correct = u8"✅";
     std::string incorrect = u8"❌";
     Bitboard key;

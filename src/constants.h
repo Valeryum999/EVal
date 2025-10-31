@@ -5,7 +5,7 @@
 #include "types.h"
 
 namespace EVal {
-
+    
 #define C64(constantU64) constantU64##ULL
 
 enum ColorType{
@@ -37,9 +37,9 @@ enum Files{
 };
 
 enum PolyglotOffsets{
-    CASTLING = 768,
-    EN_PASSANT = 772,
-    TURN = 780
+    ZH_CASTLING = 768,
+    ZH_EN_PASSANT = 772,
+    ZH_TURN = 780
 };
 
 enum hashFlags{
@@ -483,8 +483,7 @@ constexpr int mg_value[6] = { 82, 337, 365, 477, 1025,  0};
 constexpr int eg_value[6] = { 94, 281, 297, 512,  936,  0};
 constexpr int gamephaseInc[12] = {0,1,1,2,4,0,0,1,1,2,4,0};
 
-constexpr const int* mg_pesto_table[6] =
-{
+constexpr const int* mg_pesto_table[6] = {
     mg_pawn_table,
     mg_knight_table,
     mg_bishop_table,
@@ -493,8 +492,7 @@ constexpr const int* mg_pesto_table[6] =
     mg_king_table
 };
 
-constexpr const int* eg_pesto_table[6] =
-{
+constexpr const int* eg_pesto_table[6] = {
     eg_pawn_table,
     eg_knight_table,
     eg_bishop_table,
