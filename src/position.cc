@@ -947,7 +947,7 @@ int Position::parseMove(std::string uciMove) {
 void Position::parseGo(std::string go){
     std::vector<std::string> command = split(go," ");
     // dynamic time thinking
-    if(command.size() > 1){
+    if(command.size() > 4){
         if(toMove == White){
             timeToThink = atoi(command[2].c_str()) / 60000 + 1;
         } else {
@@ -983,7 +983,7 @@ void Position::parsePosition(std::string position){
             }
         }
     }
-    visualizeBoard();
+    //visualizeBoard();
 }
 
 void Position::printBitBoard(Bitboard bitboard) const{
