@@ -1242,7 +1242,7 @@ void Position::startSearch() {
         // printf("Current evaluation %.2f\n", bestEval/100*((toMove == White) ? 1 : -1));
         // printf("Max ply reached: %d\n", maxPly);
         printf("info score cp %d depth %d nodes %lld pv", bestEval, searchDepth, nodes);
-        for(int i=0; i<6; i++){
+        for(int i=0; i<PVLength[0]; i++){
             printf(" ");
             printMoveUCI(PVTable[0][i]);
         }
