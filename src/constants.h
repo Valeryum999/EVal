@@ -8,12 +8,6 @@ namespace EVal {
     
 #define C64(constantU64) constantU64##ULL
 
-enum ColorType{
-    White,
-    Black,
-    Both
-};
-
 enum Ranks{
     FIRST_RANK,
     SECOND_RANK,
@@ -81,7 +75,7 @@ constexpr char colors[2][6] = {
     "Black"
 };
     
-constexpr char pieces[12][12] = {
+constexpr char string_pieces[12][12] = {
     "WhitePawn",
     "WhiteKnight",
     "WhiteBishop",

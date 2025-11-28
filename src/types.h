@@ -46,6 +46,14 @@ enum Square : uint8_t{
     noSquare
 };
 
+constexpr Square& operator++(Square& s) { return s = Square(int(s) + 1); }
+constexpr Square operator+(Square s, int i) { return Square(int(s) + i); }
+constexpr Square operator-(Square s, int i) { return Square(int(s) - i); }
+constexpr Square& operator+=(Square& s, int i) { return s = s + i; }
+constexpr Square& operator-=(Square& s, int i) { return s = s - i; }
+
+constexpr Piece& operator++(Piece& p) { return p = Piece(int(p) + 1); }
+
 constexpr bool is_ok(Square s) { return s >= a1 && s <= h8; }
 
 enum MoveType {

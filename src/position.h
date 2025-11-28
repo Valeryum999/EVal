@@ -2,6 +2,7 @@
 #define BOARD_H
 
 #include "constants.h"
+#include "types.h"
 #include <iostream>
 #include <vector>
 #include <locale>
@@ -15,7 +16,7 @@ namespace EVal {
 #define setBit(bitboard, square) (bitboard |= C64(1) << square)
 #define popBit(bitboard, square) (bitboard ^= C64(1) << square)
 
-inline __attribute__((always_inline)) int getBit(Bitboard bitboard, unsigned int square){
+inline __attribute__((always_inline)) int getBit(Bitboard bitboard, Square square){
     return bitboard >> square & 1;
 }
 
@@ -42,7 +43,7 @@ inline __attribute__((always_inline)) int getBit(Bitboard bitboard, unsigned int
     Bitboard pieceBoardCopy[12];                                         \
     Bitboard occupiedBoardCopy[3], emptyBoardCopy;                       \
     int butterflyBoardCopy[64];                                     \
-    ColorType toMoveCopy;                                           \
+    Color toMoveCopy;                                           \
     Square enPassantCopy;                                           \
     int castlingRightsCopy;                                         \
     Bitboard ZobristHashKeyCopy;                                         \
@@ -90,17 +91,10 @@ class Position{
     int castlingRights;
     bool canEnPassant[2];
     Bitboard lastMovedPiece;
-    Bitboard pawnAttacks[2][64];
-    Bitboard knightAttacks[64];
-    Bitboard bishopMasks[64];
-    Bitboard bishopAttacks[64][512];
-    Bitboard rookMasks[64];
-    Bitboard rookAttacks[64][4096];
-    Bitboard kingAttacks[64];
     int butterflyBoard[64];
     Square enPassant;
     bool didPolyglotFlipEnPassant;
-    ColorType toMove;
+    Color toMove;
     int ply;
     int maxPly;
     int PVLength[64];
@@ -119,75 +113,124 @@ class Position{
 
     public:
         Position();
-        constexpr void addMove(int move,moves *moveList);
-        // unsigned int bitCount(Bitboard board) const;
-        constexpr int evaluatePosition();
-        Bitboard findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const;
-        void FromFEN(std::string FEN);
-        constexpr Bitboard generateBishopAttacksOnTheFly(unsigned int square, Bitboard block) const;
-        constexpr Bitboard generateRookAttacksOnTheFly(unsigned int square, Bitboard block) const;
-        Bitboard generateMagicNumber() const;
-        int generateRandomLegalMove();
-        Bitboard generateZobristHashKey();
-        constexpr Bitboard getBishopAttacks(unsigned int square, Bitboard occupancy) const;
-        constexpr Bitboard getRookAttacks(unsigned int square, Bitboard occupancy) const;
-        constexpr Bitboard getQueenAttacks(unsigned int square, Bitboard occupancy) const;
-        int getAllPossibleMoves(moves *moveList);
-        Piece getPieceAtSquare(Bitboard square) const;
-        Bitboard getRandomBitboardnumber() const;
-        void initLeaperPiecesMoves();
-        void initMagicNumbers() const;
-        constexpr void initTables();
-        void initTranspositionTable();
-        void initSliderPiecesMoves(bool bishop);
-        bool isSquareAttacked(unsigned int square,ColorType color) const;
+
+        // Position representation
+        Bitboard pieces() const; // get all pieces (== occupiedBoard)
+        template<typename... PieceType>
+        Bitboard pieces(PieceType... piece) const;
+        Bitboard pieces(Color c) const;
+        template<typename... PieceType>
+        Bitboard pieces(Color c, PieceType... piece) const;
+        Piece piece_on(Square square) const;
+        Color to_move() const;
+        int castling_rights() const;
+        Square ep_square() const;
+        bool isSquareAttacked(Square square, Color color) const;
+
+        //search and evaluation
         int makeMove(int move);
-        Bitboard maskKingAttacks(unsigned int square);
-        Bitboard maskKnightAttacks(unsigned int square);
-        Bitboard maskPawnAttacks(unsigned int square, ColorType color);
-        Bitboard maskBishopOccupancy(unsigned int square) const;
-        Bitboard maskRookOccupancy(unsigned int square) const;
+        int scoreMove(int move);
+        void initTables();
+        int quiescienceSearch(int alpha, int beta);
+        int searchBestMove(int depth, int alpha, int beta);
+        void sortMoves(moves *moveList);
+        int evaluatePosition();
+        void startSearch();
+
+        //magic
+        Bitboard findMagicNumber(Square square, int relevantBits, bool isBishop) const;
+        Bitboard generateMagicNumber() const;
+        Bitboard getRandomBitboardnumber() const;
+        void initMagicNumbers() const;
+
+        // FEN string i/o
+        void FromFEN(std::string FEN);
         Square parseSquare(std::string square);
         int parseMove(std::string uciMove);
+
+        // zobrist tt
+        Bitboard generateZobristHashKey();
+        void ZobristHashingTestSuite();
+        void initTranspositionTable();
+        int probeHash(int depth, int alpha, int beta, int *move);
+        void recordHash(int depth, int evaluation, int hashFlag, int move);
+        
+        //uci
+        void UCImainLoop();
         void parseGo(std::string go);
         void parsePosition(std::string position);
-        long long perftDriver(int depth);
-        void perftTestSuite();
-        void printBitBoard(Bitboard bitboard) const;
         void printMove(int move) const;
         void printMoveUCI(int move) const;
+
+        //visuals
+        void printBitBoard(Bitboard bitboard) const;
         void printMoveList(moves *moveList) const;
         void printMoveScores(moves *moveList, int *scores);
-        int probeHash(int depth, int alpha, int beta, int *move);
-        int quiescienceSearch(int alpha, int beta);
-        void recordHash(int depth, int evaluation, int hashFlag, int move);
-        int scoreMove(int move);
-        int searchBestMove(int depth, int alpha, int beta);
-        Bitboard setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_mask) const;
-        void sleep(int seconds);
-        void sortMoves(moves *moveList);
-        std::vector<std::string> split(std::string s,std::string delimiter);
-        void startSearch();
-        Bitboard swapNBits(Bitboard board, int i, int j, int n);
-        void test();
-        void UCImainLoop();
-        int undoMove(int move);
         void visualizeBoard() const;
         void visualizeButterflyBoard() const;
-        void ZobristHashingTestSuite();
+
+        //perft
+        long long perftDriver(int depth);
+        void perftTestSuite();
+
+        //TODO fix these
+        void sleep(int seconds);
+        std::vector<std::string> split(std::string s,std::string delimiter);
+        void test();
+        int undoMove(int move);
 };
+
+inline Color Position::to_move() const { return toMove; }
+
+inline Bitboard Position::pieces() const { return occupiedBoard[BOTH]; }
+
+template<typename... PieceType>
+inline Bitboard Position::pieces(PieceType... piece) const{
+    return (pieceBoard[piece] | ...);
+}
+
+inline Bitboard Position::pieces(Color c) const { return occupiedBoard[c]; }
+
+template<typename... PieceType>
+inline Bitboard Position::pieces(Color c, PieceType... piece) const{
+    return pieces(c) & pieces(piece...);
+}
+
+inline int Position::castling_rights() const { return castlingRights; }
+
+inline Square Position::ep_square() const { return enPassant; }
 
 constexpr Bitboard square_bb(Square s) {
     assert(is_ok(s));
     return (1ULL << s);
 }
 
+constexpr void addMove(int move, moves *moveList){
+    moveList->moves[moveList->count] = move;
+    moveList->count++;
+}
+
 inline __attribute__((always_inline)) unsigned int popcount(Bitboard bitboard) {
     return __builtin_popcountll(bitboard);
 }
 
-inline __attribute__((always_inline)) unsigned int lsb(Bitboard bitboard) {
-    return __builtin_ctzll(bitboard);
+inline __attribute__((always_inline)) Square lsb(Bitboard bitboard) {
+    assert(bitboard != 0);
+    return Square(__builtin_ctzll(bitboard));
+}
+
+constexpr void apply_permutation(int *v, int count, int * indices){
+    using std::swap; // to permit Koenig lookup
+    for (int i = 0; i < count; i++) {
+        auto current = i;
+        while (i != indices[current]) {
+            auto next = indices[current];
+            swap(v[current], v[next]);
+            indices[current] = current;
+            current = next;
+        }
+        indices[current] = current;
+    }
 }
 
 } //namespace EVal

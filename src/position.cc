@@ -1,4 +1,5 @@
 #include "position.h"
+#include "movegen.h"
 
 namespace EVal{
 
@@ -17,18 +18,18 @@ Position::Position() {
     pieceBoard[BlackRook]     = 0x0000000000000000;
     pieceBoard[BlackQueen]    = 0x0000000000000000;
     pieceBoard[BlackKing]     = 0x0000000000000000;
-    occupiedBoard[White]      = 0x0000000000000000;
-    occupiedBoard[Black]      = 0x0000000000000000;
-    occupiedBoard[Both]       = 0x0000000000000000;
+    occupiedBoard[WHITE]      = 0x0000000000000000;
+    occupiedBoard[BLACK]      = 0x0000000000000000;
+    occupiedBoard[BOTH]       = 0x0000000000000000;
     for(int square=a1; square<=h8; square++) butterflyBoard[square] = NoPiece;
     castlingRights = 0;
-    canEnPassant[White] = false;
-    canEnPassant[Black] = false;
+    canEnPassant[WHITE] = false;
+    canEnPassant[BLACK] = false;
     enPassant = noSquare;
-    toMove = White;
-    initLeaperPiecesMoves();
-    initSliderPiecesMoves(false);
-    initSliderPiecesMoves(true);
+    toMove = WHITE;
+    MoveGen::initLeaperPiecesMoves();
+    MoveGen::initSliderPiecesMoves(false);
+    MoveGen::initSliderPiecesMoves(true);
     ply = 0;
     maxPly = 0;
     nodes = 0;
@@ -42,36 +43,17 @@ Position::Position() {
     timeToThink = 5000; //default 5 seconds
 }
 
-constexpr void Position::addMove(int move, moves *moveList){
-    moveList->moves[moveList->count] = move;
-    moveList->count++;
-}
-
-void apply_permutation(int *v, int count, int * indices){
-    using std::swap; // to permit Koenig lookup
-    for (int i = 0; i < count; i++) {
-        auto current = i;
-        while (i != indices[current]) {
-            auto next = indices[current];
-            swap(v[current], v[next]);
-            indices[current] = current;
-            current = next;
-        }
-        indices[current] = current;
-    }
-}
-
-constexpr int Position::evaluatePosition(){
+int Position::evaluatePosition(){
     int middlegame[2] = {0,0};
     int endgame[2] = {0,0};
     int mobility[2] = {0,0};
     int gamePhase = 0;
 
-    for(int square=0; square < 64; square++){
+    for(Square square=a1; square < h8; ++square){
         int piece = butterflyBoard[square];
         if(piece == NoPiece) continue;
-        middlegame[(piece - 6) < 0 ? White : Black] += mg_table[piece][squareToVisualBoardSquare[square]];
-        endgame[(piece - 6) < 0 ? White : Black] += eg_table[piece][squareToVisualBoardSquare[square]];
+        middlegame[(piece - 6) < 0 ? WHITE : BLACK] += mg_table[piece][squareToVisualBoardSquare[square]];
+        endgame[(piece - 6) < 0 ? WHITE : BLACK] += eg_table[piece][squareToVisualBoardSquare[square]];
         gamePhase += gamephaseInc[piece];
         switch(piece){
             case WhitePawn:
@@ -80,37 +62,37 @@ constexpr int Position::evaluatePosition(){
             case WhiteKnight:
             case BlackKnight:
                 if(piece == WhiteKnight)
-                    mobility[White] += popcount(knightAttacks[square] & ~occupiedBoard[White]);
+                    mobility[WHITE] += popcount(MoveGen::knightAttacks[square] & ~occupiedBoard[WHITE]);
                 else
-                    mobility[Black] += popcount(knightAttacks[square] & ~occupiedBoard[Black]);
+                    mobility[BLACK] += popcount(MoveGen::knightAttacks[square] & ~occupiedBoard[BLACK]);
                 break;
             case WhiteBishop:
             case BlackBishop:
                 if(piece == WhiteBishop)
-                    mobility[White] += popcount(getBishopAttacks(square, occupiedBoard[Both]) & ~occupiedBoard[White]);
+                    mobility[WHITE] += popcount(MoveGen::getBishopAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
                 else
-                    mobility[Black] += popcount(getBishopAttacks(square, occupiedBoard[Both]) & ~occupiedBoard[Black]);
+                    mobility[BLACK] += popcount(MoveGen::getBishopAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
                 break;
             case WhiteRook:
             case BlackRook:
                 if(piece == WhiteRook)
-                    mobility[White] += popcount(getRookAttacks(square, occupiedBoard[Both]) & ~occupiedBoard[White]);
+                    mobility[WHITE] += popcount(MoveGen::getRookAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
                 else
-                    mobility[Black] += popcount(getRookAttacks(square, occupiedBoard[Both]) & ~occupiedBoard[Black]);
+                    mobility[BLACK] += popcount(MoveGen::getRookAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
                 break;
             case WhiteQueen:
             case BlackQueen:
                 if(piece == WhiteQueen)
-                    mobility[White] += popcount(getQueenAttacks(square,occupiedBoard[Both]) & ~occupiedBoard[White]);
+                    mobility[WHITE] += popcount(MoveGen::getQueenAttacks(square,occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
                 else
-                    mobility[Black] += popcount(getQueenAttacks(square,occupiedBoard[Both]) & ~occupiedBoard[Black]);
+                    mobility[BLACK] += popcount(MoveGen::getQueenAttacks(square,occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
                 break;
             case WhiteKing:
             case BlackKing:
                 if(piece == WhiteKing)
-                    mobility[White] -= popcount(kingAttacks[square] & ~occupiedBoard[White]);
+                    mobility[WHITE] -= popcount(MoveGen::kingAttacks[square] & ~occupiedBoard[WHITE]);
                 else
-                    mobility[Black] -= popcount(kingAttacks[square] & ~occupiedBoard[Black]);
+                    mobility[BLACK] -= popcount(MoveGen::kingAttacks[square] & ~occupiedBoard[BLACK]);
                 break;
         }
     }
@@ -123,19 +105,20 @@ constexpr int Position::evaluatePosition(){
     return (middlegameScore * middlegamePhase + endgameScore * endgamePhase) / 24 + mobilityScore;
 }
 
-Bitboard Position::findMagicNumber(unsigned int square, int relevantBits, bool isBishop) const{
+Bitboard Position::findMagicNumber(Square square, int relevantBits, bool isBishop) const{
     Bitboard occupancies[4096];
     Bitboard attacks[4096];
     Bitboard usedAttacks[4096];
 
-    Bitboard occupancyMask = isBishop ? maskBishopOccupancy(square) : maskRookOccupancy(square);
+    Bitboard occupancyMask = isBishop ? MoveGen::maskBishopOccupancy(square) 
+                                      : MoveGen::maskRookOccupancy(square);
 
     int occupancyIndices = 1 << relevantBits;
 
     for(int index=0; index<occupancyIndices; index++){
-        occupancies[index] = setOccupancyBits(index, relevantBits, occupancyMask);
-        attacks[index] = isBishop ? generateBishopAttacksOnTheFly(square,occupancies[index]) 
-                                  : generateRookAttacksOnTheFly(square,occupancies[index]);
+        occupancies[index] = MoveGen::setOccupancyBits(index, relevantBits, occupancyMask);
+        attacks[index] = isBishop ? MoveGen::generateBishopAttacksOnTheFly(square,occupancies[index]) 
+                                  : MoveGen::generateRookAttacksOnTheFly(square,occupancies[index]);
     }
 
     for(int randomCount=0; randomCount < 1000000000; randomCount++){
@@ -159,51 +142,8 @@ Bitboard Position::findMagicNumber(unsigned int square, int relevantBits, bool i
     return 0;
 }
 
-void Position::initLeaperPiecesMoves() {
-    for(int square=0; square<64; square++){
-        pawnAttacks[White][square] = maskPawnAttacks(square,White);
-        pawnAttacks[Black][square] = maskPawnAttacks(square,Black);
-        knightAttacks[square] = maskKnightAttacks(square);
-        kingAttacks[square] = maskKingAttacks(square);
-    }
-}
-
 void Position::initTranspositionTable() {
     memset(transpositionTable, 0, sizeof(transpositionTable));
-}
-
-void Position::initSliderPiecesMoves(bool bishop) {
-    for(int square=0; square < 64; square++){
-        bishopMasks[square] = maskBishopOccupancy(square);
-        rookMasks[square] = maskRookOccupancy(square);
-        Bitboard occupancyMask = bishop ? bishopMasks[square] : rookMasks[square];
-        int relevantpopcount = bishop ? bishopRelevantBits[square] : rookRelevantBits[square];
-        int occupancyIndices = 1 << relevantpopcount;
-
-        for(int index=0; index < occupancyIndices; index++){
-            if(bishop){
-                Bitboard occupancy = setOccupancyBits(index, bishopRelevantBits[square], occupancyMask);
-                int magicIndex = (occupancy * bishopMagicNumbers[square]) >> (64-relevantpopcount);
-                bishopAttacks[square][magicIndex] = generateBishopAttacksOnTheFly(square,occupancy);
-            } else {
-                Bitboard occupancy = setOccupancyBits(index, rookRelevantBits[square], occupancyMask);
-                int magicIndex = (occupancy * rookMagicNumbers[square]) >> (64-relevantpopcount);
-                rookAttacks[square][magicIndex] = generateRookAttacksOnTheFly(square,occupancy);
-            }
-        }
-    }
-}
-
-int Position::generateRandomLegalMove() {
-    moves moveList[1];
-    moveList->count = 0;
-    getAllPossibleMoves(moveList);
-    int move = 0;
-    do{
-        int randomIndex = rand() % moveList->count;
-        move = moveList->moves[randomIndex];
-    } while(!makeMove(move));
-    return move;
 }
 
 Bitboard Position::generateZobristHashKey(){
@@ -222,251 +162,13 @@ Bitboard Position::generateZobristHashKey(){
     if(castlingRights & 4) key ^= PolyglotRandomNumbers[ZH_CASTLING+2];
     if(castlingRights & 8) key ^= PolyglotRandomNumbers[ZH_CASTLING+3];
 
-    if((enPassant != noSquare) && (pawnAttacks[1-toMove][enPassant] & pieceBoard[WhitePawn+6*toMove]))
+    if((enPassant != noSquare) && (MoveGen::pawnAttacks[1-toMove][enPassant] & pieceBoard[WhitePawn+6*toMove]))
         key ^= PolyglotRandomNumbers[ZH_EN_PASSANT+enPassant%8];
     
-    if(toMove == White)
+    if(toMove == WHITE)
         key ^= PolyglotRandomNumbers[ZH_TURN];
     
     return key;
-}
-
-constexpr Bitboard Position::getBishopAttacks(unsigned int square, Bitboard occupancy) const{
-    occupancy &= bishopMasks[square];
-    occupancy *= bishopMagicNumbers[square];
-    occupancy >>= 64 - bishopRelevantBits[square];
-    return bishopAttacks[square][occupancy];
-}
-
-constexpr Bitboard Position::getRookAttacks(unsigned int square, Bitboard occupancy) const{
-    occupancy &= rookMasks[square];
-    occupancy *= rookMagicNumbers[square];
-    occupancy >>= 64 - rookRelevantBits[square];
-    return rookAttacks[square][occupancy];
-}
-
-constexpr Bitboard Position::getQueenAttacks(unsigned int square, Bitboard occupancy) const{
-    return getBishopAttacks(square, occupancy) | getRookAttacks(square, occupancy);
-}
-
-int Position::getAllPossibleMoves(moves *moveList) {
-    moveList->count = 0;
-    int result = 0;
-    Bitboard bitboard, attacks;
-    unsigned int fromSquare, toSquare;
-    for(unsigned int piece=WhitePawn; piece<=BlackKing; piece++){
-        bitboard = pieceBoard[piece];
-        if(toMove == White){
-            if(piece == WhitePawn){
-                while(bitboard){
-                    fromSquare = lsb(bitboard);
-                    toSquare = fromSquare + 8;
-                    if(!(toSquare > h8) && !getBit(occupiedBoard[Both],toSquare)){
-                        if(fromSquare >= a7 && fromSquare <= h7){
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteQueen,0,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteRook,0,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteBishop,0,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteKnight,0,0,0,0),moveList);
-                        } else {
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,0,0,0,0,0),moveList);
-                            if((fromSquare >= a2 && fromSquare <= h2) 
-                                && !getBit(occupiedBoard[Both], (toSquare+8)))
-                                addMove(encodeMove(fromSquare,(toSquare+8),WhitePawn,0,0,1,0,0),moveList);
-                        }
-                    }
-                    attacks = pawnAttacks[toMove][fromSquare] & occupiedBoard[Black];
-                    while(attacks){
-                        toSquare = lsb(attacks);
-                        if(fromSquare >= a7 && fromSquare <= h7){
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteQueen,1,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteRook,1,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteBishop,1,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,WhiteKnight,1,0,0,0),moveList);
-                        } else {
-                            addMove(encodeMove(fromSquare,toSquare,WhitePawn,0,1,0,0,0),moveList);
-                        }
-                        popBit(attacks,toSquare);
-                    }
-                    if(enPassant != noSquare){
-                        Bitboard enPassantAttacks = pawnAttacks[White][fromSquare] & (square_bb(enPassant));
-                        if(enPassantAttacks){
-                            unsigned int toEnpassant = lsb(enPassantAttacks);
-                            addMove(encodeMove(fromSquare,toEnpassant,WhitePawn,0,1,0,1,0),moveList);
-                        }
-                    }
-
-                    popBit(bitboard, fromSquare);
-                }
-                continue;
-            }
-            if(piece == WhiteKing){
-                if(castlingRights & 1){
-                    if(!getBit(occupiedBoard[Both],f1) && !getBit(occupiedBoard[Both],g1)){
-                        if(!isSquareAttacked(e1, Black) 
-                        && !isSquareAttacked(f1,Black) 
-                        && !isSquareAttacked(g1,Black)) addMove(encodeMove(e1,g1,WhiteKing,0,0,0,0,1),moveList);
-                    }
-                }
-                if(castlingRights & 2){
-                    if(!getBit(occupiedBoard[Both],b1)
-                    && !getBit(occupiedBoard[Both],c1) 
-                    && !getBit(occupiedBoard[Both],d1)){
-                        if(!isSquareAttacked(e1,Black) 
-                        && !isSquareAttacked(c1,Black) 
-                        && !isSquareAttacked(d1,Black)) addMove(encodeMove(e1,c1,WhiteKing,0,0,0,0,1),moveList);
-                    }
-                }
-            }
-        } else {
-            if(piece == BlackPawn){
-                while(bitboard){
-                    fromSquare = lsb(bitboard);
-                    toSquare = fromSquare - 8;
-                    if(!(toSquare < a1) && !getBit(occupiedBoard[Both],toSquare)){
-                        if(fromSquare >= a2 && fromSquare <= h2){
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackQueen,0,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackRook,0,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackBishop,0,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackKnight,0,0,0,0),moveList);
-                        } else {
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,0,0,0,0,0),moveList);
-                            if((fromSquare >= a7 && fromSquare <= h7) 
-                                && !getBit(occupiedBoard[Both], (toSquare-8)))
-                                addMove(encodeMove(fromSquare,(toSquare-8),BlackPawn,0,0,1,0,0),moveList);
-                        }
-                    }
-                    attacks = pawnAttacks[toMove][fromSquare] & occupiedBoard[White];
-                    while(attacks){
-                        toSquare = lsb(attacks);
-                        if(fromSquare >= a2 && fromSquare <= h2){
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackQueen,1,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackRook,1,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackBishop,1,0,0,0),moveList);
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,BlackKnight,1,0,0,0),moveList);
-                        } else {
-                            addMove(encodeMove(fromSquare,toSquare,BlackPawn,0,1,0,0,0),moveList);
-                        }
-                        popBit(attacks,toSquare);
-                    }
-                    if(enPassant != noSquare){
-                        Bitboard enPassantAttacks = pawnAttacks[Black][fromSquare] & (square_bb(enPassant));
-                        if(enPassantAttacks){
-                            unsigned int toEnpassant = lsb(enPassantAttacks);
-                            addMove(encodeMove(fromSquare,toEnpassant,BlackPawn,0,1,0,1,0),moveList);
-                        }
-                    }
-                    popBit(bitboard, fromSquare);
-                }
-                continue;
-            }
-            if(piece == BlackKing){
-                if(castlingRights & 4){
-                    if(!getBit(occupiedBoard[Both],f8) 
-                    && !getBit(occupiedBoard[Both],g8)){
-                        if(!isSquareAttacked(e8,White) 
-                        && !isSquareAttacked(f8,White) 
-                        && !isSquareAttacked(g8,White)) addMove(encodeMove(e8,g8,BlackKing,0,0,0,0,1),moveList);
-                    }
-                }
-                if(castlingRights & 8){
-                    if(!getBit(occupiedBoard[Both],b8)
-                    && !getBit(occupiedBoard[Both],c8) 
-                    && !getBit(occupiedBoard[Both],d8)){
-                        if(!isSquareAttacked(e8,White) 
-                        && !isSquareAttacked(c8,White) 
-                        && !isSquareAttacked(d8,White)) addMove(encodeMove(e8,c8,BlackKing,0,0,0,0,1),moveList);
-                    }
-                }
-            }
-        }
-        if((toMove == White) ? piece == WhiteKnight : piece == BlackKnight){
-            while(bitboard){
-                fromSquare = lsb(bitboard);
-                attacks = knightAttacks[fromSquare] & 
-                            ((toMove == White) ? ~occupiedBoard[White] : ~occupiedBoard[Black]);
-                while(attacks){
-                    toSquare = lsb(attacks);
-                    if(!getBit(((toMove == White) ? occupiedBoard[Black] : occupiedBoard[White]),toSquare)){
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,0,0,0,0),moveList);
-                    } else {
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,1,0,0,0),moveList);
-                    }
-                    popBit(attacks,toSquare);
-                }
-                popBit(bitboard, fromSquare);
-            }
-        }
-        if((toMove == White) ? piece == WhiteBishop : piece == BlackBishop){
-            while(bitboard){
-                fromSquare = lsb(bitboard);
-                attacks = getBishopAttacks(fromSquare, occupiedBoard[Both]) & 
-                            ((toMove == White) ? ~occupiedBoard[White] : ~occupiedBoard[Black]);
-                while(attacks){
-                    toSquare = lsb(attacks);
-                    if(!getBit(((toMove == White) ? occupiedBoard[Black] : occupiedBoard[White]),toSquare)){
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,0,0,0,0),moveList);
-                    } else {
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,1,0,0,0),moveList);
-                    }
-                    popBit(attacks,toSquare);
-                }
-                popBit(bitboard, fromSquare);
-            }
-        }
-        if((toMove == White) ? piece == WhiteRook : piece == BlackRook){
-            while(bitboard){
-                fromSquare = lsb(bitboard);
-                attacks = getRookAttacks(fromSquare, occupiedBoard[Both]) & 
-                            ((toMove == White) ? ~occupiedBoard[White] : ~occupiedBoard[Black]);
-                while(attacks){
-                    toSquare = lsb(attacks);
-                    if(!getBit(((toMove == White) ? occupiedBoard[Black] : occupiedBoard[White]),toSquare)){
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,0,0,0,0),moveList);
-                    } else {
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,1,0,0,0),moveList);
-                    }
-                    popBit(attacks,toSquare);
-                }
-                popBit(bitboard, fromSquare);
-            }
-        }
-        if((toMove == White) ? piece == WhiteQueen : piece == BlackQueen){
-            while(bitboard){
-                fromSquare = lsb(bitboard);
-                attacks = getQueenAttacks(fromSquare, occupiedBoard[Both]) & 
-                            ((toMove == White) ? ~occupiedBoard[White] : ~occupiedBoard[Black]);
-                while(attacks){
-                    toSquare = lsb(attacks);
-                    if(!getBit(((toMove == White) ? occupiedBoard[Black] : occupiedBoard[White]),toSquare)){
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,0,0,0,0),moveList);
-                    } else {
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,1,0,0,0),moveList);
-                    }
-                    popBit(attacks,toSquare);
-                }
-                popBit(bitboard, fromSquare);
-            }
-        }
-
-        if((toMove == White) ? piece == WhiteKing : piece == BlackKing){
-            while(bitboard){
-                fromSquare = lsb(bitboard);
-                attacks = kingAttacks[fromSquare] & 
-                            ((toMove == White) ? ~occupiedBoard[White] : ~occupiedBoard[Black]);
-                while(attacks){
-                    toSquare = lsb(attacks);
-                    if(!getBit(((toMove == White) ? occupiedBoard[Black] : occupiedBoard[White]),toSquare)){
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,0,0,0,0),moveList);
-                    } else {
-                        addMove(encodeMove(fromSquare,toSquare,piece,0,1,0,0,0),moveList);
-                    }
-                    popBit(attacks,toSquare);
-                }
-                popBit(bitboard, fromSquare);
-            }
-        }
-    }
-    return result;
 }
 
 Bitboard Position::getRandomBitboardnumber() const{
@@ -483,28 +185,28 @@ Bitboard Position::generateMagicNumber() const{
     return getRandomBitboardnumber() & getRandomBitboardnumber() & getRandomBitboardnumber(); 
 }
 
-bool Position::isSquareAttacked(unsigned int square, ColorType color) const{
-    if((color == White) && (pawnAttacks[Black][square] & pieceBoard[WhitePawn])) return true;
-    if((color == Black) && (pawnAttacks[White][square] & pieceBoard[BlackPawn])) return true;
-    if(knightAttacks[square] & ((color == White) ? pieceBoard[WhiteKnight] : pieceBoard[BlackKnight])) return true;
-    if(getBishopAttacks(square,occupiedBoard[Both]) & pieceBoard[WhiteBishop + 6*color]) return true;
-    if(getRookAttacks(square,occupiedBoard[Both]) & pieceBoard[WhiteRook + 6*color]) return true;
-    if(getQueenAttacks(square,occupiedBoard[Both]) & pieceBoard[WhiteQueen + 6*color]) return true;
-    if(kingAttacks[square] & pieceBoard[WhiteKing + 6*color]) return true;
+bool Position::isSquareAttacked(Square square, Color color) const{
+    if((color == WHITE) && (MoveGen::pawnAttacks[BLACK][square] & pieceBoard[WhitePawn])) return true;
+    if((color == BLACK) && (MoveGen::pawnAttacks[WHITE][square] & pieceBoard[BlackPawn])) return true;
+    if(MoveGen::knightAttacks[square] & ((color == WHITE) ? pieceBoard[WhiteKnight] : pieceBoard[BlackKnight])) return true;
+    if(MoveGen::getBishopAttacks(square,occupiedBoard[BOTH]) & pieceBoard[WhiteBishop + 6*color]) return true;
+    if(MoveGen::getRookAttacks(square,occupiedBoard[BOTH]) & pieceBoard[WhiteRook + 6*color]) return true;
+    if(MoveGen::getQueenAttacks(square,occupiedBoard[BOTH]) & pieceBoard[WhiteQueen + 6*color]) return true;
+    if(MoveGen::kingAttacks[square] & pieceBoard[WhiteKing + 6*color]) return true;
     return false;
 }
 
 void Position::initMagicNumbers() const{
-    for(int square=0; square<64; square++){
+    for(Square square=a1; square<h8; ++square){
         printf(" 0x%lxULL,\n", findMagicNumber(square,bishopRelevantBits[square], true));
     }
 
-    for(int square=0; square<64; square++){
+    for(Square square=a1; square<h8; ++square){
         printf(" 0x%lxULL,\n", findMagicNumber(square,rookRelevantBits[square], false));
     }
 }
 
-constexpr void Position::initTables() {
+void Position::initTables() {
     for (int piece = WhitePawn; piece <= WhiteKing; piece++) {
         for (int square = 0; square < 64; square++) {
             mg_table[piece][square] = mg_value[piece] + mg_pesto_table[piece][square];
@@ -517,23 +219,23 @@ constexpr void Position::initTables() {
 
 int Position::makeMove(int move){
     copyBoard();
-    unsigned int fromSquare = getFrom(move);
-    unsigned int toSquare = getTo(move);
-    Bitboard bbFromSquare = square_bb(Square(fromSquare));
-    Bitboard bbToSquare   = square_bb(Square(toSquare));
+    Square fromSquare = Square(getFrom(move));
+    Square toSquare = Square(getTo(move));
+    Bitboard bbFromSquare = square_bb(fromSquare);
+    Bitboard bbToSquare   = square_bb(toSquare);
     Bitboard bbFromToSquare = bbFromSquare ^ bbToSquare;
     int piece = getPiece(move);
     int promoted = getPromotedPiece(move);
     pieceBoard[piece] ^= bbFromToSquare;
     occupiedBoard[toMove] ^= bbFromToSquare;
-    occupiedBoard[Both] ^= bbFromToSquare;
+    occupiedBoard[BOTH] ^= bbFromToSquare;
     ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[piece]+fromSquare];
     ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[piece]+toSquare];
     if(getCaptureFlag(move)){
         if(butterflyBoard[toSquare] != NoPiece){
             pieceBoard[butterflyBoard[toSquare]] ^= bbToSquare;
             occupiedBoard[1-toMove] ^= bbToSquare;
-            occupiedBoard[Both] ^= bbToSquare;
+            occupiedBoard[BOTH] ^= bbToSquare;
             ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[butterflyBoard[toSquare]]+toSquare];
         }
     }
@@ -547,16 +249,16 @@ int Position::makeMove(int move){
         ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[promoted]+toSquare];
     }
     if(getEnPassantFlag(move)){
-        if(toMove == White){
+        if(toMove == WHITE){
             popBit(pieceBoard[BlackPawn],(toSquare-8));
-            popBit(occupiedBoard[Black],(toSquare-8));
-            popBit(occupiedBoard[Both],(toSquare-8));
+            popBit(occupiedBoard[BLACK],(toSquare-8));
+            popBit(occupiedBoard[BOTH],(toSquare-8));
             butterflyBoard[toSquare-8] = NoPiece;
             ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackPawn]+toSquare-8];
         } else {
             popBit(pieceBoard[WhitePawn],(toSquare+8));
-            popBit(occupiedBoard[White],(toSquare+8));
-            popBit(occupiedBoard[Both],(toSquare+8));
+            popBit(occupiedBoard[WHITE],(toSquare+8));
+            popBit(occupiedBoard[BOTH],(toSquare+8));
             butterflyBoard[toSquare+8] = NoPiece;
             ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhitePawn]+toSquare+8];
         }         
@@ -569,8 +271,8 @@ int Position::makeMove(int move){
     }
 
     if(getDoublePawnPushFlag(move)){
-        enPassant = (Square)((toMove == White) ? toSquare - 8 : toSquare + 8);
-        if((pawnAttacks[toMove][enPassant] & pieceBoard[BlackPawn-6*toMove])){
+        enPassant = (Square)((toMove == WHITE) ? toSquare - 8 : toSquare + 8);
+        if((MoveGen::pawnAttacks[toMove][enPassant] & pieceBoard[BlackPawn-6*toMove])){
             ZobristHashKey ^= PolyglotRandomNumbers[ZH_EN_PASSANT+enPassant%8];
             didPolyglotFlipEnPassant = true;
         }
@@ -580,8 +282,8 @@ int Position::makeMove(int move){
         switch(toSquare){
             case g1:
                 pieceBoard[WhiteRook] ^= h1f1;
-                occupiedBoard[White] ^= h1f1;
-                occupiedBoard[Both] ^= h1f1;
+                occupiedBoard[WHITE] ^= h1f1;
+                occupiedBoard[BOTH] ^= h1f1;
                 butterflyBoard[h1] = NoPiece;
                 butterflyBoard[f1] = WhiteRook;
                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhiteRook]+h1];
@@ -589,8 +291,8 @@ int Position::makeMove(int move){
                 break;
             case c1:
                 pieceBoard[WhiteRook] ^= a1d1;
-                occupiedBoard[White]  ^= a1d1;
-                occupiedBoard[Both]   ^= a1d1;
+                occupiedBoard[WHITE]  ^= a1d1;
+                occupiedBoard[BOTH]   ^= a1d1;
                 butterflyBoard[a1] = NoPiece;
                 butterflyBoard[d1] = WhiteRook;
                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[WhiteRook]+a1];
@@ -598,8 +300,8 @@ int Position::makeMove(int move){
                 break;
             case g8:
                 pieceBoard[BlackRook] ^= h8f8;
-                occupiedBoard[Black]  ^= h8f8;
-                occupiedBoard[Both]   ^= h8f8;
+                occupiedBoard[BLACK]  ^= h8f8;
+                occupiedBoard[BOTH]   ^= h8f8;
                 butterflyBoard[h8] = NoPiece;
                 butterflyBoard[f8] = BlackRook;
                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+h8];
@@ -607,14 +309,16 @@ int Position::makeMove(int move){
                 break;
             case c8:
                 pieceBoard[BlackRook] ^= a8d8;
-                occupiedBoard[Black]  ^= a8d8;
-                occupiedBoard[Both]   ^= a8d8;
+                occupiedBoard[BLACK]  ^= a8d8;
+                occupiedBoard[BOTH]   ^= a8d8;
                 butterflyBoard[a8] = NoPiece;
                 butterflyBoard[d8] = BlackRook;
                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+a8];
                 ZobristHashKey ^= PolyglotRandomNumbers[64*PolyglotKindOfPiece[BlackRook]+d8];
                 break;
-        }     
+            default:
+                break;
+        }
     }
     castlingRights &= castlingRightsTable[fromSquare];
     castlingRights &= castlingRightsTable[toSquare];
@@ -649,10 +353,13 @@ int Position::makeMove(int move){
         }
     }
     
-    toMove = (ColorType)(1-toMove);
+    toMove = (Color)(1-toMove);
     ZobristHashKey ^= PolyglotRandomNumbers[ZH_TURN];
 
-    if(isSquareAttacked((toMove == White) ? lsb(pieceBoard[BlackKing]) : lsb(pieceBoard[WhiteKing]),toMove)){
+    if(isSquareAttacked((toMove == WHITE) ?
+                          lsb(pieceBoard[BlackKing])
+                        : lsb(pieceBoard[WhiteKing]),
+                        toMove)){
             restoreBoard();
             return 0;
         }
@@ -661,7 +368,7 @@ int Position::makeMove(int move){
 
 void Position::test() {
     moves moveList[1];
-    getAllPossibleMoves(moveList);
+    // getAllPossibleMoves(moveList);
     printMoveList(moveList);
 
     for(int i=0; i<moveList->count; i++){
@@ -686,14 +393,21 @@ long long Position::perftDriver(int depth){
     }
     long long nodes = 0;
     moves moveList[1];
-    getAllPossibleMoves(moveList);
-    
+    MoveGen::getAllPossibleMoves(*this, moveList);
+    // printMoveList(moveList);
+    int partial_result = 0;
     for(int i=0; i<moveList->count; i++){
         copyBoard();
         if(!makeMove(moveList->moves[i])) continue;
-        nodes += perftDriver(depth-1);
+        partial_result = perftDriver(depth-1);
+        // if(depth == 1){
+        //     printMoveUCI(moveList->moves[i]);
+        //     printf(": %d\n", partial_result);
+        // }
+        nodes += partial_result;
         restoreBoard();
     }
+
     return nodes;
 }
 
@@ -767,144 +481,6 @@ void Position::perftTestSuite(){
     return;
 }
 
-Bitboard Position::maskKingAttacks(unsigned int square){
-    Bitboard attacks = 0;
-    Bitboard king = square_bb(Square(square));
-
-    attacks |= king << 7 & notFirstRankHFile;
-    attacks |= king << 8 & notFirstRank;  
-    attacks |= king << 9 & notFirstRankAFile; 
-    attacks |= king << 1 & notAFile; 
-    attacks |= king >> 7 & notEighthRankAFile;
-    attacks |= king >> 8 & notEighthRank; 
-    attacks |= king >> 9 & notEighthRankHFile; 
-    attacks |= king >> 1 & notHFile;
-
-    return attacks;
-}
-
-Bitboard Position::maskKnightAttacks(unsigned int square){
-    Bitboard attacks = 0;
-    Bitboard knight = square_bb(Square(square));
-
-    attacks |= knight << 17 & notAFile;
-    attacks |= knight << 10 & notABFiles;  
-    attacks |= knight >>  6 & notABFiles; 
-    attacks |= knight >> 15 & notAFile; 
-    attacks |= knight << 15 & notHFile;
-    attacks |= knight <<  6 & notGHFiles; 
-    attacks |= knight >> 10 & notGHFiles; 
-    attacks |= knight >> 17 & notHFile;
-
-    return attacks;
-}
-
-Bitboard Position::maskPawnAttacks(unsigned int square, ColorType color){
-    Bitboard attacks = 0;
-    Bitboard pawn = square_bb(Square(square));
-
-    if(color == White){
-        attacks |= pawn << 7 & notHFile;
-        attacks |= pawn << 9 & notAFile;
-    } else {
-        attacks |= pawn >> 7 & notAFile;
-        attacks |= pawn >> 9 & notHFile;
-    }
-
-    return attacks;
-}
-
-Bitboard Position::maskBishopOccupancy(unsigned int square) const{
-    Bitboard occupancy = 0;
-    int bishopRank = square / 8;
-    int bishopFile = square % 8;
-    int rank,file;
-    for(rank=bishopRank+1, file=bishopFile+1; rank<7 && file<7; rank++, file++)
-        occupancy |= square_bb(Square(rank*8 + file));
-    for(rank=bishopRank-1, file=bishopFile+1; rank>0 && file<7; rank--, file++)
-        occupancy |= square_bb(Square(rank*8 + file));
-    for(rank=bishopRank+1, file=bishopFile-1; rank<7 && file>0; rank++, file--)
-        occupancy |= square_bb(Square(rank*8 + file));
-    for(rank=bishopRank-1, file=bishopFile-1; rank>0 && file>0; rank--, file--)
-        occupancy |= square_bb(Square(rank*8 + file));
-
-    return occupancy;
-}
-
-Bitboard Position::maskRookOccupancy(unsigned int square) const{
-    Bitboard occupancy = 0;
-    int rookRank = square / 8;
-    int rookFile = square % 8;
-    int rank,file;
-    for(rank=rookRank+1; rank<7; rank++)
-        occupancy |= square_bb(Square(rank*8 + rookFile));
-    for(rank=rookRank-1; rank>0; rank--)
-        occupancy |= square_bb(Square(rank*8 + rookFile));
-    for(file=rookFile+1; file<7; file++)
-        occupancy |= square_bb(Square(rookRank*8 + file));
-    for(file=rookFile-1; file>0; file--)
-        occupancy |= square_bb(Square(rookRank*8 + file));
-
-
-    return occupancy;
-}
-
-constexpr Bitboard Position::generateBishopAttacksOnTheFly(unsigned int square, Bitboard block) const{
-    Bitboard attacks = 0;
-    int bishopRank = square / 8;
-    int bishopFile = square % 8;
-    int rank = 0;
-    int file = 0;
-    for(rank=bishopRank+1, file=bishopFile+1; rank<=7 && file<=7; rank++, file++){
-        attacks |= square_bb(Square(rank*8 + file));
-        if(square_bb(Square(rank*8 + file)) & block) break;
-    }
-    for(rank=bishopRank-1, file=bishopFile+1; rank>=0 && file<=7; rank--, file++){
-        attacks |= square_bb(Square(rank*8 + file));
-        if(square_bb(Square(rank*8 + file)) & block) break;
-    }
-    for(rank=bishopRank+1, file=bishopFile-1; rank<=7 && file>=0; rank++, file--){
-        attacks |= square_bb(Square(rank*8 + file));
-        if(square_bb(Square(rank*8 + file)) & block) break;
-    }
-    for(rank=bishopRank-1, file=bishopFile-1; rank>=0 && file>=0; rank--, file--){
-        attacks |= square_bb(Square(rank*8 + file));
-        if(square_bb(Square(rank*8 + file)) & block) break;
-    }
-
-    return attacks;
-}
-
-constexpr Bitboard Position::generateRookAttacksOnTheFly(unsigned int square, Bitboard block) const{
-    Bitboard attacks = 0;
-    int rookRank = square / 8;
-    int rookFile = square % 8;
-    int rank = 0;
-    int file = 0;
-    for(rank=rookRank+1; rank<=7; rank++){
-        Bitboard attack = square_bb(Square(rank*8 + rookFile));
-        attacks |= attack;
-        if(attack & block) break;
-    }
-    for(rank=rookRank-1; rank>=0; rank--){
-        Bitboard attack = square_bb(Square(rank*8 + rookFile));
-        attacks |= attack;
-        if(attack & block) break;
-    }
-    for(file=rookFile+1; file<=7; file++){
-        Bitboard attack = square_bb(Square(rookRank*8 + file));
-        attacks |= attack;
-        if(attack & block) break;
-    }
-    for(file=rookFile-1; file>=0; file--){
-        Bitboard attack = square_bb(Square(rookRank*8 + file));
-        attacks |= attack;
-        if(attack & block) break;
-    }
-
-    return attacks;
-}
-
 Square Position::parseSquare(std::string square){
     int file = square[0] - 'a';
     int rank = square[1] - '1';
@@ -913,7 +489,7 @@ Square Position::parseSquare(std::string square){
 
 int Position::parseMove(std::string uciMove) {
     moves moveList[1];
-    getAllPossibleMoves(moveList);
+    MoveGen::getAllPossibleMoves(*this, moveList);
     int length = uciMove.length();
     if(length != 4 && length != 5) return 0;
     unsigned int fromSquare = parseSquare(uciMove.substr(0,2));
@@ -948,7 +524,7 @@ void Position::parseGo(std::string go){
     std::vector<std::string> command = split(go," ");
     // dynamic time thinking
     if(command.size() > 4){
-        if(toMove == White){
+        if(toMove == WHITE){
             timeToThink = atoi(command[2].c_str()) / 60000 + 1;
         } else {
             timeToThink = atoi(command[4].c_str()) / 60000 + 1;
@@ -991,7 +567,7 @@ void Position::printBitBoard(Bitboard bitboard) const{
     for(int rank=7; rank>=0; rank--){
         std::cout << "  " << rank+1 << "  ";
         for(int file=0; file<8; file++){
-            std::cout << getBit(bitboard,(rank*8+file))  << " ";
+            std::cout << getBit(bitboard, Square(rank*8+file))  << " ";
         }
         std::cout << std::endl;
     }
@@ -1057,7 +633,7 @@ int Position::quiescienceSearch(int alpha, int beta){
     if(currentEval >= beta) return beta;
     if(currentEval > alpha) alpha = currentEval;
     moves moveList[1];
-    getAllPossibleMoves(moveList);
+    MoveGen::getAllPossibleMoves(*this, moveList);
     sortMoves(moveList);
     for(int i=0; i<moveList->count; i++){
         if(!getCaptureFlag(moveList->moves[i])) continue;
@@ -1116,7 +692,7 @@ int Position::searchBestMove(int depth, int alpha, int beta){
     int legalMoves = 0;
     moves moveList[1];
     moveList->count = 0;
-    getAllPossibleMoves(moveList);
+    MoveGen::getAllPossibleMoves(*this, moveList);
     sortMoves(moveList);
     for(int i=0; i<moveList->count; i++){
         copyBoard();
@@ -1154,26 +730,16 @@ int Position::searchBestMove(int depth, int alpha, int beta){
     }
 
     if(legalMoves == 0){
-        if(isSquareAttacked(lsb(pieceBoard[(toMove == White) ? WhiteKing : BlackKing]),(ColorType)(1-toMove))){
+        if(isSquareAttacked(lsb(pieceBoard[(toMove == WHITE) 
+                            ? WhiteKing 
+                            : BlackKing]),
+                            (Color)(1-toMove))){
             return -50000+ply;
         }
         return 0;
     }
 
     return alpha;
-}
-
-Bitboard Position::setOccupancyBits(int index, int bitsInMask, Bitboard occupancy_mask) const{
-    Bitboard occupancy = 0;
-
-    for(int count=0; count<bitsInMask; count++){
-        int square = lsb(occupancy_mask);
-        popBit(occupancy_mask,square);
-        if(index & (1 << count))
-            occupancy |= square_bb(Square(square));
-    }
-
-    return occupancy;
 }
 
 void Position::sleep(int seconds){
@@ -1239,8 +805,6 @@ void Position::startSearch() {
             printf("Stopped search at depth: %d\n", searchDepth);
             break;
         }
-        // printf("Current evaluation %.2f\n", bestEval/100*((toMove == White) ? 1 : -1));
-        // printf("Max ply reached: %d\n", maxPly);
         printf("info score cp %d depth %d nodes %lld pv", bestEval, searchDepth, nodes);
         for(int i=0; i<PVLength[0]; i++){
             printf(" ");
@@ -1307,51 +871,51 @@ void Position::visualizeBoard() const{
     std::string renderBoard[8][32];
     for(int rank=0; rank<8; rank++){
         for(int file=0; file<8; file++){
-            if(getBit(pieceBoard[WhitePawn],(rank*8 + file)) == 1) {
+            if(getBit(pieceBoard[WhitePawn],Square(rank*8 + file)) == 1) {
                 renderBoard[rank][file] = whitePawn;
                 continue;
             }
-            if(getBit(pieceBoard[BlackPawn],(rank*8 + file)) == 1){
+            if(getBit(pieceBoard[BlackPawn],Square(rank*8 + file)) == 1){
                 renderBoard[rank][file] = blackPawn;
                 continue;
             }
-            if(getBit(pieceBoard[WhiteKnight],(rank*8 + file)) == 1) {
+            if(getBit(pieceBoard[WhiteKnight],Square(rank*8 + file)) == 1) {
                 renderBoard[rank][file] = whiteKnight;
                 continue;
             }
-            if(getBit(pieceBoard[BlackKnight],(rank*8 + file)) == 1){
+            if(getBit(pieceBoard[BlackKnight],Square(rank*8 + file)) == 1){
                 renderBoard[rank][file] = blackKnight;
                 continue;
             }
-            if(getBit(pieceBoard[WhiteBishop],(rank*8 + file)) == 1) {
+            if(getBit(pieceBoard[WhiteBishop],Square(rank*8 + file)) == 1) {
                 renderBoard[rank][file] = whiteBishop;
                 continue;
             }
-            if(getBit(pieceBoard[BlackBishop],(rank*8 + file)) == 1){
+            if(getBit(pieceBoard[BlackBishop],Square(rank*8 + file)) == 1){
                 renderBoard[rank][file] = blackBishop;
                 continue;
             }
-            if(getBit(pieceBoard[WhiteRook],(rank*8 + file)) == 1) {
+            if(getBit(pieceBoard[WhiteRook],Square(rank*8 + file)) == 1) {
                 renderBoard[rank][file] = whiteRook;
                 continue;
             }
-            if(getBit(pieceBoard[BlackRook],(rank*8 + file)) == 1){
+            if(getBit(pieceBoard[BlackRook],Square(rank*8 + file)) == 1){
                 renderBoard[rank][file] = blackRook;
                 continue;
             }
-            if(getBit(pieceBoard[WhiteQueen],(rank*8 + file)) == 1) {
+            if(getBit(pieceBoard[WhiteQueen],Square(rank*8 + file)) == 1) {
                 renderBoard[rank][file] = whiteQueen;
                 continue;
             }
-            if(getBit(pieceBoard[BlackQueen],(rank*8 + file)) == 1){
+            if(getBit(pieceBoard[BlackQueen],Square(rank*8 + file)) == 1){
                 renderBoard[rank][file] = blackQueen;
                 continue;
             }
-            if(getBit(pieceBoard[WhiteKing],(rank*8 + file)) == 1) {
+            if(getBit(pieceBoard[WhiteKing],Square(rank*8 + file)) == 1) {
                 renderBoard[rank][file] = whiteKing;
                 continue;
             }
-            if(getBit(pieceBoard[BlackKing],(rank*8 + file)) == 1){
+            if(getBit(pieceBoard[BlackKing],Square(rank*8 + file)) == 1){
                 renderBoard[rank][file] = blackKing;
                 continue;
             }
@@ -1402,15 +966,15 @@ void Position::FromFEN(std::string FEN){
     pieceBoard[BlackRook]     = 0x0000000000000000;
     pieceBoard[BlackQueen]    = 0x0000000000000000;
     pieceBoard[BlackKing]     = 0x0000000000000000;
-    occupiedBoard[White]      = 0x0000000000000000;
-    occupiedBoard[Black]      = 0x0000000000000000;
-    occupiedBoard[Both]       = 0x0000000000000000;
+    occupiedBoard[WHITE]      = 0x0000000000000000;
+    occupiedBoard[BLACK]      = 0x0000000000000000;
+    occupiedBoard[BOTH]       = 0x0000000000000000;
     for(int square=a1; square<=h8; square++) butterflyBoard[square] = NoPiece;
     castlingRights = 0;
     enPassant = noSquare;
     unsigned int rank = EIGHT_RANK;
     unsigned int index = 0;
-    unsigned int position = 56;
+    Square position = a8;
     Bitboard pawn;
     Bitboard knight;
     Bitboard bishop;
@@ -1476,98 +1040,98 @@ void Position::FromFEN(std::string FEN){
                 break;
 
             case 'r':
-                rook = square_bb(Square(position));
+                rook = square_bb(position);
                 pieceBoard[BlackRook] ^= rook;
-                occupiedBoard[Black] ^= rook;
-                occupiedBoard[Both] ^= rook;
+                occupiedBoard[BLACK] ^= rook;
+                occupiedBoard[BOTH] ^= rook;
                 butterflyBoard[position] = BlackRook;
                 position += 1;
                 break;
             case 'R':
-                rook = square_bb(Square(position));
+                rook = square_bb(position);
                 pieceBoard[WhiteRook] ^= rook;
-                occupiedBoard[White] ^= rook;
-                occupiedBoard[Both] ^= rook;
+                occupiedBoard[WHITE] ^= rook;
+                occupiedBoard[BOTH] ^= rook;
                 butterflyBoard[position] = WhiteRook;
                 position += 1;
                 break;
             case 'b':
-                bishop = square_bb(Square(position));
+                bishop = square_bb(position);
                 pieceBoard[BlackBishop] ^= bishop;
-                occupiedBoard[Black] ^= bishop;
-                occupiedBoard[Both] ^= bishop;
+                occupiedBoard[BLACK] ^= bishop;
+                occupiedBoard[BOTH] ^= bishop;
                 butterflyBoard[position] = BlackBishop;
                 position += 1;
                 break;
             case 'B':
-                bishop = square_bb(Square(position));
+                bishop = square_bb(position);
                 pieceBoard[WhiteBishop] ^= bishop;
-                occupiedBoard[White] ^= bishop;
-                occupiedBoard[Both] ^= bishop;
+                occupiedBoard[WHITE] ^= bishop;
+                occupiedBoard[BOTH] ^= bishop;
                 butterflyBoard[position] = WhiteBishop;
                 position += 1;
                 break;
             case 'n':
-                knight = square_bb(Square(position));
+                knight = square_bb(position);
                 pieceBoard[BlackKnight] ^= knight;
-                occupiedBoard[Black] ^= knight;
-                occupiedBoard[Both] ^= knight;
+                occupiedBoard[BLACK] ^= knight;
+                occupiedBoard[BOTH] ^= knight;
                 butterflyBoard[position] = BlackKnight;
                 position += 1;
                 break;
             case 'N':
-                knight = square_bb(Square(position));
+                knight = square_bb(position);
                 pieceBoard[WhiteKnight] ^= knight;
-                occupiedBoard[White] ^= knight;
-                occupiedBoard[Both] ^= knight;
+                occupiedBoard[WHITE] ^= knight;
+                occupiedBoard[BOTH] ^= knight;
                 butterflyBoard[position] = WhiteKnight;
                 position += 1;
                 break;
             case 'q':
-                queen = square_bb(Square(position));
+                queen = square_bb(position);
                 pieceBoard[BlackQueen] ^= queen;
-                occupiedBoard[Black] ^= queen;
-                occupiedBoard[Both] ^= queen;
+                occupiedBoard[BLACK] ^= queen;
+                occupiedBoard[BOTH] ^= queen;
                 butterflyBoard[position] = BlackQueen;
                 position += 1;
                 break;
             case 'Q':
-                queen = square_bb(Square(position));
+                queen = square_bb(position);
                 pieceBoard[WhiteQueen] ^= queen;
-                occupiedBoard[White] ^= queen;
-                occupiedBoard[Both] ^= queen;
+                occupiedBoard[WHITE] ^= queen;
+                occupiedBoard[BOTH] ^= queen;
                 butterflyBoard[position] = WhiteQueen;
                 position += 1;
                 break;
             case 'k':
-                king = square_bb(Square(position));
+                king = square_bb(position);
                 pieceBoard[BlackKing] ^= king;
-                occupiedBoard[Black] ^= king;
-                occupiedBoard[Both] ^= king;
+                occupiedBoard[BLACK] ^= king;
+                occupiedBoard[BOTH] ^= king;
                 butterflyBoard[position] = BlackKing;
                 position += 1;
                 break;
             case 'K':
-                king = square_bb(Square(position));
+                king = square_bb(position);
                 pieceBoard[WhiteKing] ^= king;
-                occupiedBoard[White] ^= king;
-                occupiedBoard[Both] ^= king;
+                occupiedBoard[WHITE] ^= king;
+                occupiedBoard[BOTH] ^= king;
                 butterflyBoard[position] = WhiteKing;
                 position += 1;
                 break;
             case 'p':
-                pawn = square_bb(Square(position));
+                pawn = square_bb(position);
                 pieceBoard[BlackPawn] ^= pawn;
-                occupiedBoard[Black] ^= pawn;
-                occupiedBoard[Both] ^= pawn;
+                occupiedBoard[BLACK] ^= pawn;
+                occupiedBoard[BOTH] ^= pawn;
                 butterflyBoard[position] = BlackPawn;
                 position += 1;
                 break;
             case 'P':
-                pawn = square_bb(Square(position));
+                pawn = square_bb(position);
                 pieceBoard[WhitePawn] ^= pawn;
-                occupiedBoard[White] ^= pawn;
-                occupiedBoard[Both] ^= pawn;
+                occupiedBoard[WHITE] ^= pawn;
+                occupiedBoard[BOTH] ^= pawn;
                 butterflyBoard[position] = WhitePawn;
                 position += 1;
                 break;
@@ -1581,7 +1145,7 @@ void Position::FromFEN(std::string FEN){
         index++;
     }
     index++;
-    toMove = (FEN[index] == 'w') ? White : Black;
+    toMove = (FEN[index] == 'w') ? WHITE : BLACK;
     index+=2;
     while(FEN[index] != ' '){
         switch(FEN[index]){
