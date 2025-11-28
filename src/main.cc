@@ -1,6 +1,6 @@
 #include <iostream>
-#include "position.h"
 #include <string>
+#include "uci.h"
 
 using namespace EVal;
 
@@ -10,7 +10,7 @@ int main(int argc, const char *argv[]){
     if(argc == 2){
         if(!strcmp(argv[1],"DEBUG")) isDebug = true;
     }
-    if(!isDebug) board.UCImainLoop();
+    if(!isDebug) UCI::UCImainLoop(&board);
 
     //debug
 

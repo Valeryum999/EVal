@@ -1,5 +1,6 @@
 #include "position.h"
 #include "movegen.h"
+#include "uci.h"
 
 namespace EVal{
 
@@ -481,87 +482,6 @@ void Position::perftTestSuite(){
     return;
 }
 
-Square Position::parseSquare(std::string square){
-    int file = square[0] - 'a';
-    int rank = square[1] - '1';
-    return (Square)(rank * 8 + file);
-}
-
-int Position::parseMove(std::string uciMove) {
-    moves moveList[1];
-    MoveGen::getAllPossibleMoves(*this, moveList);
-    int length = uciMove.length();
-    if(length != 4 && length != 5) return 0;
-    unsigned int fromSquare = parseSquare(uciMove.substr(0,2));
-    unsigned int toSquare = parseSquare(uciMove.substr(2,2));
-    for(int i=0; i<moveList->count; i++){
-        int currentMove = moveList->moves[i];
-        if(getFrom(currentMove) == fromSquare && getTo(currentMove) == toSquare){
-            if(length == 4) return currentMove;
-            int promotedPiece = getPromotedPiece(currentMove);
-            switch(uciMove[4]){
-                case 'q':
-                    if(promotedPiece == WhiteQueen || promotedPiece == BlackQueen) return currentMove;
-                    break;
-                case 'n':
-                    if(promotedPiece == WhiteKnight || promotedPiece == BlackKnight) return currentMove;
-                    break;
-                case 'r':
-                    if(promotedPiece == WhiteRook || promotedPiece == BlackRook) return currentMove;
-                    break;
-                case 'b':
-                    if(promotedPiece == WhiteBishop || promotedPiece == BlackBishop) return currentMove;
-                    break;
-                default:
-                    return 0;
-            }
-        }
-    }
-    return 0;
-}
-
-void Position::parseGo(std::string go){
-    std::vector<std::string> command = split(go," ");
-    // dynamic time thinking
-    if(command.size() > 4){
-        if(toMove == WHITE){
-            timeToThink = atoi(command[2].c_str()) / 60000 + 1;
-        } else {
-            timeToThink = atoi(command[4].c_str()) / 60000 + 1;
-        }
-    } else {
-        timeToThink = 5;
-    }
-    startSearch();
-    printf("\n");
-    std::cout << "bestmove ";
-    printMoveUCI(PVTable[0][0]);
-    std::cout << std::endl;
-    //printMoveUCI(generateRandomLegalMove());
-}
-
-void Position::parsePosition(std::string position){
-    std::vector<std::string> command = split(position," ");
-    if(command[1] == "startpos"){
-        FromFEN(startingPosition);
-        if(command[2] == "moves") {
-            for(auto it=command.begin()+3; it!=command.end(); it++){
-                makeMove(parseMove(*it));
-            }
-        }
-    } else if(command[1] == "fen"){
-        int FENlength = position.find(command[8]) - position.find(command[2]);
-        std::string FEN = position.substr(position.find(command[2]),FENlength);
-        FromFEN(FEN);
-        if(command[8] == "moves"){
-            for(auto it=command.begin()+9; it!=command.end(); it++){
-                makeMove(parseMove(*it));
-            }
-        }
-    }
-    //visualizeBoard();
-}
-
 void Position::printBitBoard(Bitboard bitboard) const{
     std::cout << std::endl << std::endl;
     for(int rank=7; rank>=0; rank--){
@@ -584,13 +504,6 @@ void Position::printMove(int move) const{
                         << (getDoublePawnPushFlag(move) ? "    double pawn push " : "")
                         << (getEnPassantFlag(move) ? "    en passant " : "")
                         << (getCastlingFlag(move) ? "    castle" : "") << std::endl;
-}
-
-void Position::printMoveUCI(int move) const{
-    std::cout << squares[getFrom(move)]
-              << squares[getTo(move)];
-    if(getPromotedPiece(move))
-        std::cout << promotedPieces[getPromotedPiece(move)];
 }
 
 void Position::printMoveList(moves *moveList) const{
@@ -769,24 +682,10 @@ void Position::printMoveScores(moves *moveList, int *scores){
     printf("Debugging sort moves: \n");
     for(int i=0;i<moveList->count;i++){
         printf("move: ");
-        printMoveUCI(moveList->moves[i]);
+        UCI::printMoveUCI(moveList->moves[i]);
         printf(" score: %d\n", scores[i]);
     }
     printf("\n");
-}
-
-std::vector<std::string> Position::split(std::string s,std::string delimiter){
-    std::vector<std::string> tokens;
-    size_t pos = 0;
-    std::string token;
-    while ((pos = s.find(delimiter)) != std::string::npos) {
-        token = s.substr(0, pos);
-        tokens.push_back(token);
-        s.erase(0, pos + delimiter.length());
-    }
-    tokens.push_back(s);
-
-    return tokens;
 }
 
 void Position::startSearch() {
@@ -808,7 +707,7 @@ void Position::startSearch() {
         printf("info score cp %d depth %d nodes %lld pv", bestEval, searchDepth, nodes);
         for(int i=0; i<PVLength[0]; i++){
             printf(" ");
-            printMoveUCI(PVTable[0][i]);
+            UCI::printMoveUCI(PVTable[0][i]);
         }
         std::cout << std::endl;
         memcpy(PVLengthCopy, PVLength, 256);
@@ -821,50 +720,6 @@ void Position::startSearch() {
     memcpy(PVLength, PVLengthCopy, 256);
     memcpy(PVTable, PVTableCopy, 16384);
     bestEval = bestEvalSoFar;
-}
-
-void Position::UCImainLoop() {
-    setbuf(stdin, NULL);
-    setbuf(stdout, NULL);
-
-    std::string input;
-
-    std::cout << "id name EVal" << std::endl;
-    std::cout << "id name Valeryum999" << std::endl;
-    std::cout << std::endl;
-    std::cout << "option name Debug Log File type string default" <<  std::endl;
-    std::cout << "uciok" << std::endl;
-
-    while(true){
-        fflush(stdout);
-        std::getline(std::cin, input);
-        if(input == "") continue;
-        if(input == "isready"){
-            std::cout << "readyok" << std::endl;
-            continue;
-        }
-        if(input.find("position") == 0){
-            parsePosition(input);
-            continue;
-        }
-        if(input == "ucinewgame"){
-            parsePosition("position startpos");
-            continue;
-        }
-        if(input.find("go") == 0){
-            parseGo(input);
-            continue;
-        }
-        if(input == "uci"){
-            std::cout << "id name EVal" << std::endl;
-            std::cout << "id name Valeryum999" << std::endl;
-            std::cout << std::endl;
-            std::cout << "option name Debug Log File type string default" <<  std::endl;
-            std::cout << "uciok" << std::endl;
-            continue;
-        }
-        if(input == "quit") break;
-    }
 }
 
 void Position::visualizeBoard() const{
@@ -1170,7 +1025,7 @@ void Position::FromFEN(std::string FEN){
     }
     index++;
     if(FEN[index] != '-'){
-        enPassant = parseSquare(FEN.c_str()+index);
+        enPassant = UCI::parseSquare(FEN.c_str()+index);
     }
     ZobristHashKey = generateZobristHashKey();
 }

@@ -136,6 +136,8 @@ class Position{
         void sortMoves(moves *moveList);
         int evaluatePosition();
         void startSearch();
+        int best_move() const;
+        void set_time_to_think(const int& t);
 
         //magic
         Bitboard findMagicNumber(Square square, int relevantBits, bool isBishop) const;
@@ -145,8 +147,6 @@ class Position{
 
         // FEN string i/o
         void FromFEN(std::string FEN);
-        Square parseSquare(std::string square);
-        int parseMove(std::string uciMove);
 
         // zobrist tt
         Bitboard generateZobristHashKey();
@@ -154,15 +154,9 @@ class Position{
         void initTranspositionTable();
         int probeHash(int depth, int alpha, int beta, int *move);
         void recordHash(int depth, int evaluation, int hashFlag, int move);
-        
-        //uci
-        void UCImainLoop();
-        void parseGo(std::string go);
-        void parsePosition(std::string position);
-        void printMove(int move) const;
-        void printMoveUCI(int move) const;
-
+                
         //visuals
+        void printMove(int move) const;
         void printBitBoard(Bitboard bitboard) const;
         void printMoveList(moves *moveList) const;
         void printMoveScores(moves *moveList, int *scores);
@@ -175,7 +169,6 @@ class Position{
 
         //TODO fix these
         void sleep(int seconds);
-        std::vector<std::string> split(std::string s,std::string delimiter);
         void test();
         int undoMove(int move);
 };
@@ -199,6 +192,10 @@ inline Bitboard Position::pieces(Color c, PieceType... piece) const{
 inline int Position::castling_rights() const { return castlingRights; }
 
 inline Square Position::ep_square() const { return enPassant; }
+
+inline int Position::best_move() const { return PVTable[0][0]; }
+
+inline void Position::set_time_to_think(const int& t) { timeToThink = t; }
 
 constexpr Bitboard square_bb(Square s) {
     assert(is_ok(s));
