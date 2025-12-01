@@ -51,6 +51,7 @@ constexpr Square operator+(Square s, int i) { return Square(int(s) + i); }
 constexpr Square operator-(Square s, int i) { return Square(int(s) - i); }
 constexpr Square& operator+=(Square& s, int i) { return s = s + i; }
 constexpr Square& operator-=(Square& s, int i) { return s = s - i; }
+constexpr Color operator~(Color c) { return Color(1-c); }
 
 constexpr Piece& operator++(Piece& p) { return p = Piece(int(p) + 1); }
 
