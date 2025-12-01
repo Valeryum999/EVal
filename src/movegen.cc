@@ -26,22 +26,6 @@ Bitboard getRookAttacks(Square square, Bitboard occupancy) {
     return rookAttacks[square][occupancy];
 }
     
-Bitboard getQueenAttacks(Square square, Bitboard occupancy) {
-    return getBishopAttacks(square, occupancy) | getRookAttacks(square, occupancy);
-}
-
-int generateRandomLegalMove() {
-    moves moveList[1];
-    moveList->count = 0;
-    // getAllPossibleMoves(moveList);
-    int move = 0;
-    // do{
-    //     int randomIndex = rand() % moveList->count;
-    //     move = moveList->moves[randomIndex];
-    // } while(!makeMove(move));
-    return move;
-}
-
 int getAllPossibleMoves(const Position& pos, moves *moveList) {
     moveList->count = 0;
     int result = 0;
@@ -194,7 +178,7 @@ int getAllPossibleMoves(const Position& pos, moves *moveList) {
         if((toMove == WHITE) ? piece == WhiteBishop : piece == BlackBishop){
             while(bitboard){
                 fromSquare = lsb(bitboard);
-                attacks = getBishopAttacks(fromSquare, pos.pieces()) & 
+                attacks = attacks_bb<BISHOP>(fromSquare, pos.pieces()) & 
                             ((toMove == WHITE) ? ~pos.pieces(WHITE) : ~pos.pieces(BLACK));
                 while(attacks){
                     toSquare = lsb(attacks);
@@ -211,7 +195,7 @@ int getAllPossibleMoves(const Position& pos, moves *moveList) {
         if((toMove == WHITE) ? piece == WhiteRook : piece == BlackRook){
             while(bitboard){
                 fromSquare = lsb(bitboard);
-                attacks = getRookAttacks(fromSquare, pos.pieces()) & 
+                attacks = attacks_bb<ROOK>(fromSquare, pos.pieces()) & 
                             ((toMove == WHITE) ? ~pos.pieces(WHITE) : ~pos.pieces(BLACK));
                 while(attacks){
                     toSquare = lsb(attacks);
@@ -228,7 +212,7 @@ int getAllPossibleMoves(const Position& pos, moves *moveList) {
         if((toMove == WHITE) ? piece == WhiteQueen : piece == BlackQueen){
             while(bitboard){
                 fromSquare = lsb(bitboard);
-                attacks = getQueenAttacks(fromSquare, pos.pieces()) & 
+                attacks = attacks_bb<QUEEN>(fromSquare, pos.pieces()) & 
                             ((toMove == WHITE) ? ~pos.pieces(WHITE) : ~pos.pieces(BLACK));
                 while(attacks){
                     toSquare = lsb(attacks);

@@ -70,23 +70,23 @@ int Position::evaluatePosition(){
             case WhiteBishop:
             case BlackBishop:
                 if(piece == WhiteBishop)
-                    mobility[WHITE] += popcount(MoveGen::getBishopAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
+                    mobility[WHITE] += popcount(MoveGen::attacks_bb<BISHOP>(square, occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
                 else
-                    mobility[BLACK] += popcount(MoveGen::getBishopAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
+                    mobility[BLACK] += popcount(MoveGen::attacks_bb<BISHOP>(square, occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
                 break;
             case WhiteRook:
             case BlackRook:
                 if(piece == WhiteRook)
-                    mobility[WHITE] += popcount(MoveGen::getRookAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
+                    mobility[WHITE] += popcount(MoveGen::attacks_bb<ROOK>(square, occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
                 else
-                    mobility[BLACK] += popcount(MoveGen::getRookAttacks(square, occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
+                    mobility[BLACK] += popcount(MoveGen::attacks_bb<ROOK>(square, occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
                 break;
             case WhiteQueen:
             case BlackQueen:
                 if(piece == WhiteQueen)
-                    mobility[WHITE] += popcount(MoveGen::getQueenAttacks(square,occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
+                    mobility[WHITE] += popcount(MoveGen::attacks_bb<QUEEN>(square,occupiedBoard[BOTH]) & ~occupiedBoard[WHITE]);
                 else
-                    mobility[BLACK] += popcount(MoveGen::getQueenAttacks(square,occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
+                    mobility[BLACK] += popcount(MoveGen::attacks_bb<QUEEN>(square,occupiedBoard[BOTH]) & ~occupiedBoard[BLACK]);
                 break;
             case WhiteKing:
             case BlackKing:
@@ -97,6 +97,26 @@ int Position::evaluatePosition(){
                 break;
         }
     }
+
+    // double, blocked or isolated pawns
+    // Bitboard our_pawns   = pieces(PAWN, to_move());
+    // Bitboard their_pawns = pieces(PAWN, 1-to_move());
+
+    // int pawnStructureScore = 0;
+
+    // while(our_pawns){
+    //     Bitboard our_pawn = our_pawns ^ (our_pawns - 1);
+    //     if(to_move() == WHITE){
+    //         if(our_pawn & pieces(PAWN, WHITE)){
+
+    //         }
+    //     } else {
+
+    //     }
+
+    //     our_pawns ^= our_pawn;
+    // }
+
     int middlegameScore = middlegame[toMove] - middlegame[1-toMove];
     int endgameScore = endgame[toMove] - endgame[1-toMove];
     int mobilityScore = mobility[toMove] - mobility[1-toMove];
@@ -190,9 +210,9 @@ bool Position::isSquareAttacked(Square square, Color color) const{
     if((color == WHITE) && (MoveGen::pawnAttacks[BLACK][square] & pieceBoard[WhitePawn])) return true;
     if((color == BLACK) && (MoveGen::pawnAttacks[WHITE][square] & pieceBoard[BlackPawn])) return true;
     if(MoveGen::knightAttacks[square] & ((color == WHITE) ? pieceBoard[WhiteKnight] : pieceBoard[BlackKnight])) return true;
-    if(MoveGen::getBishopAttacks(square,occupiedBoard[BOTH]) & pieceBoard[WhiteBishop + 6*color]) return true;
-    if(MoveGen::getRookAttacks(square,occupiedBoard[BOTH]) & pieceBoard[WhiteRook + 6*color]) return true;
-    if(MoveGen::getQueenAttacks(square,occupiedBoard[BOTH]) & pieceBoard[WhiteQueen + 6*color]) return true;
+    if(MoveGen::attacks_bb<BISHOP>(square,occupiedBoard[BOTH]) & pieceBoard[WhiteBishop + 6*color]) return true;
+    if(MoveGen::attacks_bb<ROOK>(square,occupiedBoard[BOTH]) & pieceBoard[WhiteRook + 6*color]) return true;
+    if(MoveGen::attacks_bb<QUEEN>(square,occupiedBoard[BOTH]) & pieceBoard[WhiteQueen + 6*color]) return true;
     if(MoveGen::kingAttacks[square] & pieceBoard[WhiteKing + 6*color]) return true;
     return false;
 }
@@ -590,9 +610,9 @@ int Position::scoreMove(int move){
     return 0;
 }
 
-int Position::searchBestMove(int depth, int alpha, int beta){
+int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
     nodes++;
-    // bool foundPV = false;
+    bool foundPV = false;
     PVLength[ply] = ply;
     int evaluation;
     int hashFlag = ALPHA;
@@ -618,7 +638,14 @@ int Position::searchBestMove(int depth, int alpha, int beta){
         if(!makeMove(currentMove)) continue;
         legalMoves++;
         ply++;
-        evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        if(foundPV){
+            //PVS, we try to prove that the previous PV move is better than the rest of the moves
+            evaluation = -searchBestMove(depth-1, -alpha-1, -alpha);
+            //if we are wrong and another move seems better, we re-search it normally
+            if((evaluation > alpha) && (evaluation < beta))
+                evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        } else
+            evaluation = -searchBestMove(depth-1, -beta, -alpha);
         ply--;
         restoreBoard();
         if(searchCancelled) return 0;
@@ -630,7 +657,7 @@ int Position::searchBestMove(int depth, int alpha, int beta){
         }
         if(evaluation > alpha){
             hashFlag = EXACT;
-            // foundPV = true;
+            foundPV = true;
             recordHash(depth, alpha, hashFlag, currentMove);
             if(!getCaptureFlag(currentMove))
                 historyMoves[getPiece(currentMove)][getTo(currentMove)] += depth; //remember this move as it improves our position
@@ -696,6 +723,10 @@ void Position::startSearch() {
     int bestEvalSoFar = 0;
     int PVLengthCopy[64];
     int PVTableCopy[64][64];
+    memset(killerMoves, 0, sizeof(killerMoves));
+    memset(historyMoves, 0, sizeof(historyMoves));
+    memset(PVTable, 0, sizeof(PVTable));
+    memset(PVLength, 0, sizeof(PVLength));
     auto start_time = std::chrono::high_resolution_clock::now();
     for(searchDepth = 1; searchDepth < 64; searchDepth++){
         nodes = 0;

@@ -28,8 +28,22 @@ Bitboard generateBishopAttacksOnTheFly(Square square, const Bitboard& block);
 Bitboard generateRookAttacksOnTheFly(Square square, const Bitboard& block);
 Bitboard getBishopAttacks(Square square, Bitboard occupancy);
 Bitboard getRookAttacks(Square square, Bitboard occupancy);
-Bitboard getQueenAttacks(Square square, Bitboard occupancy);
 int getAllPossibleMoves(const Position& pos, moves *moveList);
+
+template<PieceType T>
+Bitboard attacks_bb(Square square, Bitboard occupancy){
+    assert(is_ok(square));
+
+    switch(T){
+        case BISHOP:
+            return getBishopAttacks(square, occupancy);
+        case ROOK:
+            return getRookAttacks(square, occupancy);
+        case QUEEN:
+            return attacks_bb<BISHOP>(square, occupancy) 
+                 | attacks_bb<ROOK>(square, occupancy);
+    }
+}
 
 } // namespace MoveGen
 
