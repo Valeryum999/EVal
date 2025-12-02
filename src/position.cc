@@ -762,19 +762,22 @@ void Position::startSearch() {
     for(searchDepth = 1; searchDepth < 64; searchDepth++){
         nodes = 0;
         bestEval = searchBestMove(searchDepth, alpha, beta);
+        
         if(searchCancelled) {
             printf("Stopped search at depth: %d\n", searchDepth);
             break;
         }
-        if(bestEval < alpha || bestEval > beta){
-            alpha = -50000;
-            beta = 50000;
-            searchDepth--;
-            continue;
-        }
-        // aspiration window
-        alpha = bestEval - 50;
-        beta = bestEval + 50;
+
+        // if(bestEval < alpha || bestEval > beta){
+        //     alpha = -50000;
+        //     beta = 50000;
+        //     searchDepth--;
+        //     continue;
+        // }
+
+        // // aspiration window
+        // alpha = bestEval - 50;
+        // beta = bestEval + 50;
 
         printf("info score cp %d depth %d nodes %lld pv", bestEval, searchDepth, nodes);
         for(int i=0; i<PVLength[0]; i++){
