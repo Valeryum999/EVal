@@ -50,7 +50,7 @@ int Position::evaluatePosition(){
     int mobility[2] = {0,0};
     int gamePhase = 0;
 
-    for(Square square=a1; square < h8; ++square){
+    for(Square square=a1; square <= h8; ++square){
         int piece = butterflyBoard[square];
         if(piece == NoPiece) continue;
         middlegame[(piece - 6) < 0 ? WHITE : BLACK] += mg_table[piece][squareToVisualBoardSquare[square]];
@@ -610,6 +610,9 @@ int Position::scoreMove(int move){
     return 0;
 }
 
+const int FullDepthMoves = 4;
+const int ReductionLimit = 3;
+
 int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
     nodes++;
     bool foundPV = false;
@@ -623,6 +626,18 @@ int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
         return quiescienceSearch(alpha,beta);
     }
     int legalMoves = 0;
+    bool is_in_check = isSquareAttacked(lsb(pieceBoard[WhiteKing + 6*toMove]), ~toMove);
+    // null move pruning
+    // if(depth >= 3 && !is_in_check && ply){
+    //     copyBoard();
+    //     toMove = ~toMove;
+    //     enPassant = noSquare;
+    //     evaluation = -searchBestMove(depth - 1 - 2, -beta, -beta + 1);
+    //     restoreBoard();
+    //     if(evaluation >= beta)
+    //         return beta;
+    // }
+
     moves moveList[1];
     moveList->count = 0;
     MoveGen::getAllPossibleMoves(*this, moveList);
@@ -644,8 +659,27 @@ int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
             //if we are wrong and another move seems better, we re-search it normally
             if((evaluation > alpha) && (evaluation < beta))
                 evaluation = -searchBestMove(depth-1, -beta, -alpha);
-        } else
-            evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        } else{
+            //LMR
+            if(i >= FullDepthMoves &&
+               depth >= ReductionLimit &&
+               !is_in_check &&
+               !getCaptureFlag(moveList->moves[i]) &&
+               !getPromotedPiece(moveList->moves[i])
+            )
+                evaluation = -searchBestMove(depth-2, -alpha - 1, -alpha);
+            else evaluation = alpha + 1;
+
+            //if found a better move during LMR
+            if(evaluation > alpha){
+                // research with full depth but narrower range
+                evaluation = -searchBestMove(depth-1, -alpha - 1, -alpha);
+
+                // if current move still seems better than the first re-search it as normal
+                if((evaluation > alpha) && (evaluation < beta))
+                    evaluation = -searchBestMove(depth-1, -beta, -alpha); 
+            }
+        }
         ply--;
         restoreBoard();
         if(searchCancelled) return 0;
