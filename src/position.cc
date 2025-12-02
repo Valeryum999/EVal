@@ -613,9 +613,8 @@ int Position::scoreMove(int move){
 const int FullDepthMoves = 4;
 const int ReductionLimit = 3;
 
-int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
+int Position::searchBestMove(int depth, int alpha, int beta){ //2879445
     nodes++;
-    bool foundPV = false;
     PVLength[ply] = ply;
     int evaluation;
     int hashFlag = ALPHA;
@@ -653,12 +652,9 @@ int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
         if(!makeMove(currentMove)) continue;
         legalMoves++;
         ply++;
-        if(foundPV){
-            //PVS, we try to prove that the previous PV move is better than the rest of the moves
-            evaluation = -searchBestMove(depth-1, -alpha-1, -alpha);
-            //if we are wrong and another move seems better, we re-search it normally
-            if((evaluation > alpha) && (evaluation < beta))
-                evaluation = -searchBestMove(depth-1, -beta, -alpha);
+        // if first move, expected PVS
+        if(i==0){
+            evaluation = -searchBestMove(depth-1, -beta, -alpha);
         } else{
             //LMR
             if(i >= FullDepthMoves &&
@@ -691,7 +687,6 @@ int Position::searchBestMove(int depth, int alpha, int beta){ //11586809 9464492
         }
         if(evaluation > alpha){
             hashFlag = EXACT;
-            foundPV = true;
             recordHash(depth, alpha, hashFlag, currentMove);
             if(!getCaptureFlag(currentMove))
                 historyMoves[getPiece(currentMove)][getTo(currentMove)] += depth; //remember this move as it improves our position
@@ -762,13 +757,25 @@ void Position::startSearch() {
     memset(PVTable, 0, sizeof(PVTable));
     memset(PVLength, 0, sizeof(PVLength));
     auto start_time = std::chrono::high_resolution_clock::now();
+    int alpha = -50000;
+    int beta = 50000;
     for(searchDepth = 1; searchDepth < 64; searchDepth++){
         nodes = 0;
-        bestEval = searchBestMove(searchDepth, -50000, 50000);
+        bestEval = searchBestMove(searchDepth, alpha, beta);
         if(searchCancelled) {
             printf("Stopped search at depth: %d\n", searchDepth);
             break;
         }
+        if(bestEval < alpha || bestEval > beta){
+            alpha = -50000;
+            beta = 50000;
+            searchDepth--;
+            continue;
+        }
+        // aspiration window
+        alpha = bestEval - 50;
+        beta = bestEval + 50;
+
         printf("info score cp %d depth %d nodes %lld pv", bestEval, searchDepth, nodes);
         for(int i=0; i<PVLength[0]; i++){
             printf(" ");
